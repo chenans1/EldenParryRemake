@@ -97,7 +97,11 @@ class hooks {
             const auto attackerState = attacker->AsActorState()->GetAttackState();
             const auto victimState = victim->AsActorState()->GetAttackState();
             const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing || attackerState == RE::ATTACK_STATE_ENUM::kHit;
+            // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing;
             const bool victimBashing = victimState == RE::ATTACK_STATE_ENUM::kBash;
+            if (!cfg.enablePowerBashParry) {
+                if (victim->IsPowerAttacking()) return false;
+            }
             if (cfg.log) {
                 SKSE::log::info("[attemptParry] attackerState={} victimState={}",
                     static_cast<std::uint32_t>(attackerState), static_cast<std::uint32_t>(victimState));
@@ -133,8 +137,16 @@ class hooks {
         static PRECISION_API::PreHitCallbackReturn OnPrecisionPreHit(const PRECISION_API::PrecisionHitData& hit) {
             PRECISION_API::PreHitCallbackReturn result{};
             const auto cfg = settings::Get();
+            if (!hit.attacker) {
+                return result;
+            }
             //remove attacker prec hitframe
-            if (hit.attacker && hit.attacker->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
+            const auto attackerState = hit.attacker->AsActorState()->GetAttackState();
+
+            if (attackerState == RE::ATTACK_STATE_ENUM::kBash) {
+                if (!cfg.enablePowerBashParry) {
+                    if (hit.attacker->IsPowerAttacking()) return result;
+                }
                 if (!hit.attacker->IsPlayerRef() && !cfg.enableNPCParry){
                     return result;
                 }
@@ -143,14 +155,15 @@ class hooks {
                 return result;
             }
             auto* victim = hit.target ? hit.target->As<RE::Actor>() : nullptr;
-            if (!hit.attacker || !victim) {
+            if (!victim) {
                 return result;
             }
             if (cfg.log) SKSE::log::info("[Precision pre-hit] attacker={:08X} victim={:08X}", hit.attacker->GetFormID(), victim->GetFormID());
+
             if (!victim->IsPlayerRef() && !cfg.enableNPCParry){
-                    return result;
-                }
-            if (hit.attacker && victim && attemptParry(hit.attacker, victim)) {
+                return result;
+            }
+            if (attemptParry(hit.attacker, victim)) {
                 result.bIgnoreHit = true;
             }
             return result;
@@ -165,7 +178,8 @@ class hooks {
             }
             //remove aggressor bash hitframe
             if (a_aggressor->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
-                if (!a_aggressor->IsPlayerRef() && !cfg.enableNPCParry) {
+                if ((!a_aggressor->IsPlayerRef() && !cfg.enableNPCParry) ||
+                    (!cfg.enablePowerBashParry && a_aggressor->IsPowerAttacking())) {
                     return _ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
                 }
                 if (cfg.log) SKSE::log::info("[processHit] a_aggressor bashing hitframe cancel");
@@ -187,6 +201,9 @@ class hooks {
             if (!actor->IsPlayerRef() && !cfg.enableNPCParry) {
                 return false;
             }
+            // if (!cfg.enablePowerBashParry && actor->IsPowerAttacking()) {
+            //     return false;
+            // }
 
             utils::applyMGEFDuration(parryDelayEffect, cfg.delay);
             utils::applyMGEFDuration(parryWindowEffect, cfg.window);
@@ -239,13 +256,12 @@ class hooks {
             const auto& tag = a_event->tag;
 
             if (utils::compare(bashRelease, tag)) {
-                SKSE::log::info("[handleEvent] bashRelease");
+                // if SKSE::log::info("[handleEvent] bashRelease");
                 applyParryWindow(actor);
             }
         }
 
         static RE::BSEventNotifyControl ProcessEvent_NPC(RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink, const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) {
-
             handleEvent(a_event);
             return _originalNPC(a_sink, a_event, a_eventSource);
         }

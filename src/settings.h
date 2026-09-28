@@ -9,8 +9,9 @@ namespace settings {
         float window = 0.36f; 
         float staggerMagnitude = 1.0f;
 
-        bool enableAOEStagger = false;
+        bool enablePowerBashParry = false;
         bool enableNPCParry = false;
+        bool enableAOEStagger = false;
         bool bEnableArrowProjectileDeflection = true;
         bool bEnableMagicProjectileDeflection = true;
 
@@ -27,6 +28,7 @@ namespace settings {
         setting_definition<float>{ "parryDelay", &settings::config::delay },
         setting_definition<float>{ "parryWindow", &settings::config::window },
         setting_definition<float>{ "staggerMagnitude", &settings::config::staggerMagnitude },
+        setting_definition<bool>{ "enablePowerBashParry", &settings::config::enablePowerBashParry },
         setting_definition<bool>{ "enableAOEStagger", &settings::config::enableAOEStagger },
         setting_definition<bool>{ "enableNPCParry", &settings::config::enableNPCParry },
         setting_definition<bool>{ "bEnableArrowProjectileDeflection", &settings::config::bEnableArrowProjectileDeflection },
