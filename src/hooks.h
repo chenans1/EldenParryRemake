@@ -36,14 +36,6 @@ class hooks {
                 _original_NPC_notify = vtblNPC.write_vfunc(0x1, NPC_NotifyAnimationGraph);
             }
             SKSE::log::info("NPC->NotifyAnimationGraph() Hooked");
-            
-            //process event hooks. both must be done.
-            // REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[2]};
-            // REL::Relocation<std::uintptr_t> vtblPC{RE::VTABLE_PlayerCharacter[2]};
-
-            // _originalNPC = vtblNPC.write_vfunc(0x1, ProcessEvent_NPC);
-            // _originalPC = vtblPC.write_vfunc(0x1, ProcessEvent_PC);
-            // SKSE::log::info("Installed PC & NPC processEvent() Hooks");
 
             auto& trampoline = SKSE::GetTrampoline();
 			_ProcessHit = trampoline.write_call<5>(RELOCATION_ID(37650, 38603).address() + REL::Relocate(0x38B, 0x45A), processHit); // SE:627930 + 38B AE:64D350 + 40A / 45A
@@ -319,35 +311,6 @@ class hooks {
             return result;
         }
 
-        static void handleEvent(const RE::BSAnimationGraphEvent* a_event) {
-            static const std::string_view bashStart{ "bashStart" };
-            // static const std::string_view bashRelease{ "bashRelease" };
-            if (!a_event || !a_event->holder || !a_event->tag.data()) return;
-            auto* holder = const_cast<RE::TESObjectREFR*>(a_event->holder);
-            if (!holder) return;
-            auto* actor = holder ? holder->As<RE::Actor>() : nullptr;
-            if (!actor) return;
-            const auto& tag = a_event->tag;
-
-            if (utils::compare(bashStart, tag)) {
-                if (settings::Get().log) SKSE::log::info("[handleEvent] bashStart actor={:08X}", actor->GetFormID());
-                applyParryWindow(actor);
-            } 
-            // else if (utils::compare(bashRelease, tag) && settings::Get().log) {
-            //     SKSE::log::info("[handleEvent] bashRelease actor={:08X}", actor->GetFormID());
-            // }
-        }
-
-        static RE::BSEventNotifyControl ProcessEvent_NPC(RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink, const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) {
-            handleEvent(a_event);
-            return _originalNPC(a_sink, a_event, a_eventSource);
-        }
-
-        static RE::BSEventNotifyControl ProcessEvent_PC(RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink, const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) {
-            handleEvent(a_event);
-            return _originalPC(a_sink, a_event, a_eventSource);
-        }
-
         //adapted from https://github.com/doodlum/EldenParry/blob/f6bd72eed354a54058805694f7adaecf24a8e0fa/src/EldenParry.cpp
         static bool canParryProjectile(RE::Actor* a_parrier, RE::TESObjectREFR* a_obj) {
             const auto cfg = settings::Get();
@@ -448,8 +411,4 @@ class hooks {
 		static inline REL::Relocation<decltype(OnMissileCollision)> _missileCollission;
         static inline REL::Relocation<decltype(PC_NotifyAnimationGraph)> _original_PC_Notify;
         static inline REL::Relocation<decltype(NPC_NotifyAnimationGraph)> _original_NPC_notify;
-        static inline REL::Relocation<decltype(ProcessEvent_NPC)> _originalNPC;
-        static inline REL::Relocation<decltype(ProcessEvent_PC)> _originalPC;
-
-
 };
