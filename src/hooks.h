@@ -93,13 +93,24 @@ class hooks {
 
         //melee collision hook. same as the original. 
         static void processHit(RE::Actor* a_aggressor, RE::Actor* a_victim, std::int64_t a_int1, bool a_bool, void* a_unkptr) {
-            SKSE::log::info("[processHit] func call");
+            //remove aggressor hitframe
+            if (a_aggressor->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
+
+                SKSE::log::info("[processHit] a_aggressor bashing hitframe cancel");
+                return;
+            }
 			if (a_victim->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
                 SKSE::log::info("[processHit] Victim bashing");
                 const auto cfg = settings::Get();
                 if (!utils::hasMGEF(a_victim, parryDelayEffect) && utils::hasMGEF(a_victim, parryWindowEffect)) {
                     SKSE::log::info("[processHit] Successful parry");
                     utils::ApplySpell(a_victim, a_victim, loadedForms.core.EP_BasherSpell);
+                    if (utils::isShield(a_victim)) {
+                        utils::play_sound(a_victim, loadedForms.core.EP_SFXWeapon);
+                    } else {
+                        utils::play_sound(a_victim, loadedForms.core.EP_SFXWeapon);
+                    }
+                    
                     if (a_aggressor) {
                         utils::ApplySpell(a_victim, a_aggressor, loadedForms.core.EP_AttackerSpell);
                         utils::overrideStaggerMagnitude(loadedForms.core.EP_StaggerSpell, loadedForms.core.EP_StaggerMGEF, cfg.staggerMagnitude);
@@ -115,7 +126,7 @@ class hooks {
             const auto cfg = settings::Get();
             utils::applyMGEFDuration(parryDelayEffect, cfg.delay);
             utils::applyMGEFDuration(parryWindowEffect, cfg.window);
-            utils::ApplySpell(actor, actor, parryDelaySpell);
+            // utils::ApplySpell(actor, actor, parryDelaySpell);
             utils::ApplySpell(actor, actor, parryWindowSpell);
             return true;
         }

@@ -5,8 +5,8 @@ namespace settings {
         bool log = true;
 
         //bashing is valid if (!delay and window)
-        float delay = 0.0f; 
-        float window = 0.3f; 
+        float delay = 0.02f; 
+        float window = 0.36f; 
         float staggerMagnitude = 1.0f;
 
         bool enableAOEStagger = false;

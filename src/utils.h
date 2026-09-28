@@ -126,4 +126,25 @@ namespace utils {
         a_effect->data.taperDuration = std::clamp(duration, 0.0f, 1.0f);
         return true;
     }
+
+    static inline bool isShield(const RE::Actor* actor) {
+        if (!actor) {
+            return false;
+        }
+
+        const auto* leftHand = actor->GetEquippedObject(true);
+        const auto* armor = leftHand ? leftHand->As<RE::TESObjectARMO>() : nullptr;
+        return armor && armor->IsShield();
+    }
+
+    static inline bool isPowerAttacking(RE::Actor* a_actor) {
+		if (a_actor->GetActorRuntimeData().currentProcess && a_actor->GetActorRuntimeData().currentProcess->high) {
+			auto atkData = a_actor->GetActorRuntimeData().currentProcess->high->attackData.get();
+			if (atkData) {
+				return atkData->data.flags.any(RE::AttackData::AttackFlag::kPowerAttack);
+			}
+		}
+		return false;
+	}
+
 }
