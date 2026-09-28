@@ -6,6 +6,7 @@ namespace form_config {
     struct CoreForms {
         RE::SpellItem* EP_AttackerSpell = nullptr;
         RE::SpellItem* EP_StaggerSpell = nullptr;
+        RE::EffectSetting* EP_StaggerMGEF = nullptr;
         RE::SpellItem* EP_AOEStaggerSpell = nullptr;
         RE::SpellItem* EP_BasherSpell = nullptr;
         RE::BGSSoundDescriptorForm* EP_SFXShield = nullptr;

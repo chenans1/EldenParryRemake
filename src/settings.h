@@ -7,8 +7,11 @@ namespace settings {
         //bashing is valid if (!delay and window)
         float delay = 0.0f; 
         float window = 0.3f; 
+        float staggerMagnitude = 1.0f;
 
         bool enableAOEStagger = false;
+        bool bEnableArrowProjectileDeflection = true;
+        bool bEnableMagicProjectileDeflection = true;
 
     };
     
@@ -22,6 +25,10 @@ namespace settings {
         setting_definition<bool>{ "log", &settings::config::log },
         setting_definition<float>{ "parryDelay", &settings::config::delay },
         setting_definition<float>{ "parryWindow", &settings::config::window },
+        setting_definition<float>{ "staggerMagnitude", &settings::config::staggerMagnitude },
+        setting_definition<bool>{ "enableAOEStagger", &settings::config::enableAOEStagger },
+        setting_definition<bool>{ "bEnableArrowProjectileDeflection", &settings::config::bEnableArrowProjectileDeflection },
+        setting_definition<bool>{ "bEnableMagicProjectileDeflection", &settings::config::bEnableMagicProjectileDeflection },
     };
 
     config Get();

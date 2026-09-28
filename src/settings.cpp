@@ -144,11 +144,18 @@ namespace settings {
         config cfg = Get();
         bool changed = false;
         // changed |= ImGuiMCP::Checkbox("Enable Sound Effects", &cfg.applyTimedBlockSFX);
-        ImGuiMCP::TextUnformatted("Parry window is valid after the delay has elapsed.");
+        ImGuiMCP::TextUnformatted("Times are measured from bash release.");
         changed |= ImGuiMCP::SliderFloat("Parry Window Delay", &cfg.delay, 0.0f, 1.0f, "%.2f");
-        changed |= ImGuiMCP::SliderFloat("Parry Window Duration", &cfg.window, cfg.delay, cfg.delay+1.0f, "%.2f");
-        ImGuiMCP::Text("Valid Active window duration %.1f% - %.1f% = %.1f%", cfg.window, cfg.delay, cfg.window-cfg.delay);
 
+        const float clampedWindow = std::clamp(cfg.window, cfg.delay, cfg.delay + 1.0f);
+        if (cfg.window != clampedWindow) {
+            cfg.window = clampedWindow;
+            changed = true;
+        }
+        changed |= ImGuiMCP::SliderFloat("Parry Window End", &cfg.window, cfg.delay, cfg.delay + 1.0f, "%.2f");
+        ImGuiMCP::Text("Active window: %.2f s to %.2f s (%.2f s)", cfg.delay, cfg.window, cfg.window - cfg.delay);
+
+        changed |= ImGuiMCP::SliderFloat("Stagger Magnitude Override", &cfg.staggerMagnitude, 0.0f, 5.0f, "%.2f");
         changed |= ImGuiMCP::Checkbox("Enable diagnostic logging", &cfg.log);
         FinishMenuPage(cfg, changed);
     }

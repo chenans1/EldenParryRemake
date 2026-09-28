@@ -48,7 +48,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     log::info("{} {} is loading...", plugin->GetName(), version);
     SKSE::Init(skse);
 
-    // SKSE::AllocTrampoline(28);
+    SKSE::AllocTrampoline(14);
     // hooks::Install();
     SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message* msg) {
         switch (msg->type) {

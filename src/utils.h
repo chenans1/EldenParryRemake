@@ -1,5 +1,4 @@
 #pragma once
-#include "hooks.h"
 #include "settings.h"
 #include "form_config.h"
 
@@ -95,12 +94,36 @@ namespace utils {
         return nullptr;
     }
 
-    //overrides the magnitude of SimpleTimedBlockTweaked.esp~0x809's 0x808 MGEF (first instance). 0.0f means disabled.
-    // inline static void overrideStaggerMagnitude(float overrideMag) {
-    //     if (overrideMag <= 0.0f) {
-    //         return;
-    //     }
-    //     auto* effect = FindEffect(hooks::STBLTweakedStaggerSpell, hooks::STBLTweakedStaggerMGEF);
-    //     effect->SetMagnitude(overrideMag);
-    // }
+    //overrides the first stagger instance mgef magnitude. 0.0f means disabled.
+    inline static void overrideStaggerMagnitude(RE::SpellItem* a_spell, RE::EffectSetting* a_mgef, float overrideMag) {
+        if (overrideMag <= 0.0 || !a_spell || !a_mgef) {
+            return;
+        }
+        auto* effect = FindEffect(a_spell, a_mgef);
+        effect->SetMagnitude(overrideMag);
+    }
+
+    //case insensitive compare for anim events
+    static inline bool compare(std::string_view left, std::string_view right) {
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (std::size_t i = 0; i < left.size(); ++i) {
+            const auto lower = [](char character) {
+                return character >= 'A' && character <= 'Z' ? static_cast<char>(character + ('a' - 'A')) : character;
+            };
+            if (lower(left[i]) != lower(right[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static inline bool applyMGEFDuration(RE::EffectSetting* a_effect, float duration) {
+        if (!a_effect) {
+            return false;
+        }
+        a_effect->data.taperDuration = std::clamp(duration, 0.0f, 1.0f);
+        return true;
+    }
 }

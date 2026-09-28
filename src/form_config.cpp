@@ -18,6 +18,8 @@ namespace form_config {
         constexpr auto defaultAOEStaggerSpell = "EldenParryRemake.esp ~ 0x802";
         constexpr auto defaultBasherSpell = "EldenParryRemake.esp ~ 0x803";
 
+        constexpr auto defaultStaggerMGEF = "EldenParryRemake.esp ~ 0x805";
+
         constexpr auto defaultSFXshield = "EldenParry.esp ~ 0xD62";
         constexpr auto defaultSFXweapon = "EldenParry.esp ~ 0xD63";
 
@@ -127,12 +129,15 @@ namespace form_config {
         loaded.core.EP_StaggerSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_StaggerSpell", defaultStaggerSpell), "Core/EP_StaggerSpell");
         loaded.core.EP_AOEStaggerSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_AOEStaggerSpell", defaultAOEStaggerSpell), "Core/EP_AOEStaggerSpell");
         loaded.core.EP_BasherSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_BasherSpell", defaultBasherSpell), "Core/EP_BasherSpell");
+        
+        loaded.core.EP_StaggerMGEF = loadForm<RE::EffectSetting>(readSetting(ini, coreSection, "EP_StaggerMGEF", defaultStaggerSpell), "Core/EP_StaggerMGEF");
+
         loaded.core.EP_SFXShield = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXShield", defaultSFXshield), "Core/EP_SFXShield");
         loaded.core.EP_SFXWeapon = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXWeapon", defaultSFXweapon), "Core/EP_SFXWeapon");
 
         activeConfig = loaded;
         SKSE::log::info("[forms] Loaded {}", requirementsPath);
-        
+
         return true;
     }
 
