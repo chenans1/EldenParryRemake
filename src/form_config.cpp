@@ -130,7 +130,7 @@ namespace form_config {
         loaded.core.EP_AOEStaggerSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_AOEStaggerSpell", defaultAOEStaggerSpell), "Core/EP_AOEStaggerSpell");
         loaded.core.EP_BasherSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_BasherSpell", defaultBasherSpell), "Core/EP_BasherSpell");
         
-        loaded.core.EP_StaggerMGEF = loadForm<RE::EffectSetting>(readSetting(ini, coreSection, "EP_StaggerMGEF", defaultStaggerSpell), "Core/EP_StaggerMGEF");
+        loaded.core.EP_StaggerMGEF = loadForm<RE::EffectSetting>(readSetting(ini, coreSection, "EP_StaggerMGEF", defaultStaggerMGEF), "Core/EP_StaggerMGEF");
 
         loaded.core.EP_SFXShield = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXShield", defaultSFXshield), "Core/EP_SFXShield");
         loaded.core.EP_SFXWeapon = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXWeapon", defaultSFXweapon), "Core/EP_SFXWeapon");

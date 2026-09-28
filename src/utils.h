@@ -99,8 +99,9 @@ namespace utils {
         if (overrideMag <= 0.0 || !a_spell || !a_mgef) {
             return;
         }
-        auto* effect = FindEffect(a_spell, a_mgef);
-        effect->SetMagnitude(overrideMag);
+        if (auto* effect = FindEffect(a_spell, a_mgef)) {
+            effect->SetMagnitude(overrideMag);
+        }
     }
 
     //case insensitive compare for anim events
