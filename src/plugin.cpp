@@ -5,6 +5,7 @@
 #include <spdlog/sinks/msvc_sink.h>
 
 #include "hooks.h"
+#include "form_config.h"
 #include "settings.h"
 
 using namespace SKSE;
@@ -46,25 +47,25 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
     auto version = plugin->GetVersion();
     log::info("{} {} is loading...", plugin->GetName(), version);
     SKSE::Init(skse);
-    
+
     // SKSE::AllocTrampoline(28);
     // hooks::Install();
-    // SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message* msg) {
-    //     switch (msg->type) {
-    //         case SKSE::MessagingInterface::kPostLoad:
-    //             settings::RegisterMenu();
-    //             break;
-    //         case SKSE::MessagingInterface::kDataLoaded:
-    //             settings::Load();
-    //             if (hooks::LoadForms()) {
-    //                 hooks::Install(); //for maxsu poise compat
-    //                 log::info("Simple timed block - tweaked has finished loading.");
-    //             } else {
-    //                 log::critical("Required forms could not be loaded; hooks will not be installed");
-    //             }
-    //             break;
-    //         }
-    // });
-    // log::info("{} has finished loading.", plugin->GetName());
+    SKSE::GetMessagingInterface()->RegisterListener([](SKSE::MessagingInterface::Message* msg) {
+        switch (msg->type) {
+            case SKSE::MessagingInterface::kPostLoad:
+                settings::RegisterMenu();
+                break;
+            case SKSE::MessagingInterface::kDataLoaded:
+                settings::Load();
+                if (form_config::Load()) {
+                    // hooks::Install(); //for maxsu poise compat
+                    log::info("EldenParryRemake: Loaded Forms");
+                } else {
+                    log::critical("Required forms could not be loaded; hooks will not be installed");
+                }
+                break;
+            }
+    });
+    log::info("{} has finished loading.", plugin->GetName());
     return true;
 }

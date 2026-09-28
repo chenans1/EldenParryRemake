@@ -1,7 +1,7 @@
 #pragma once
 #include "hooks.h"
 #include "settings.h"
-#include "extern/PerkEntryPointExtenderAPI.h"
+#include "form_config.h"
 
 namespace utils {
     inline static bool ApplySpell(RE::Actor* a_caster, RE::Actor* a_target, RE::SpellItem* a_spell) {
@@ -20,16 +20,16 @@ namespace utils {
         return false;
     }
 
-    inline static void SendTBModEvent(RE::Actor* a_defender, RE::Actor* a_attacker) {
-        const auto attacker_ID = a_attacker ? a_attacker->GetFormID() : 0x0;
-        const auto level = a_attacker ? a_attacker->GetLevel() : 0x0;
-        const auto level_arg = static_cast<float>(level);
+    // inline static void SendTBModEvent(RE::Actor* a_defender, RE::Actor* a_attacker) {
+    //     const auto attacker_ID = a_attacker ? a_attacker->GetFormID() : 0x0;
+    //     const auto level = a_attacker ? a_attacker->GetLevel() : 0x0;
+    //     const auto level_arg = static_cast<float>(level);
 
-        const SKSE::ModCallbackEvent modEvent{ .eventName = RE::BSFixedString("STBL_OnTimedBlockDefender"), .strArg = RE::BSFixedString(std::to_string(attacker_ID)), .numArg = level_arg, .sender = a_defender };
-        const SKSE::ModCallbackEvent modEventATK{ .eventName = RE::BSFixedString("STBL_OnTimedBlockAttacker"), .strArg = RE::BSFixedString(), .numArg = level_arg, .sender = a_attacker };
-        SKSE::GetModCallbackEventSource()->SendEvent(&modEvent);
-        SKSE::GetModCallbackEventSource()->SendEvent(&modEventATK);
-    }
+    //     const SKSE::ModCallbackEvent modEvent{ .eventName = RE::BSFixedString("STBL_OnTimedBlockDefender"), .strArg = RE::BSFixedString(std::to_string(attacker_ID)), .numArg = level_arg, .sender = a_defender };
+    //     const SKSE::ModCallbackEvent modEventATK{ .eventName = RE::BSFixedString("STBL_OnTimedBlockAttacker"), .strArg = RE::BSFixedString(), .numArg = level_arg, .sender = a_attacker };
+    //     SKSE::GetModCallbackEventSource()->SendEvent(&modEvent);
+    //     SKSE::GetModCallbackEventSource()->SendEvent(&modEventATK);
+    // }
 
     // plays sound if it exists on the actor. adapted from DTRY's payload and spell hotbar2
     inline static RE::BSSoundHandle play_sound(RE::Actor* actor, RE::BGSSoundDescriptorForm* sound_form) {
@@ -51,22 +51,22 @@ namespace utils {
         return handle;
     }
 
-    inline static void StaggerNearby(RE::Actor* a_defender, float radius) {
-        auto* cell = a_defender ? a_defender->GetParentCell() : nullptr;
-        if (!cell || !cell->IsAttached() || radius <= 0.0f) {
-            return;
-        }
-        radius = std::min(radius, 4095.0f);
-        cell->ForEachReferenceInRange(a_defender->GetPosition(), radius, [&](RE::TESObjectREFR* ref){
-            auto* actor = ref ? ref->As<RE::Actor>() : nullptr;
-            if (!actor || actor->IsDisabled() || !actor->Is3DLoaded() || actor == a_defender) {
-                return RE::BSContainer::ForEachResult::kContinue;
-            }
-            SKSE::log::info("[Utils] Staggering={:08X} ", actor ? actor->GetFormID() : 0);
-            ApplySpell(a_defender, actor, hooks::timedBlockStaggerSpell);
-            return RE::BSContainer::ForEachResult::kContinue;
-        });
-    }   
+    // inline static void StaggerNearby(RE::Actor* a_defender, float radius) {
+    //     auto* cell = a_defender ? a_defender->GetParentCell() : nullptr;
+    //     if (!cell || !cell->IsAttached() || radius <= 0.0f) {
+    //         return;
+    //     }
+    //     radius = std::min(radius, 4095.0f);
+    //     cell->ForEachReferenceInRange(a_defender->GetPosition(), radius, [&](RE::TESObjectREFR* ref){
+    //         auto* actor = ref ? ref->As<RE::Actor>() : nullptr;
+    //         if (!actor || actor->IsDisabled() || !actor->Is3DLoaded() || actor == a_defender) {
+    //             return RE::BSContainer::ForEachResult::kContinue;
+    //         }
+    //         SKSE::log::info("[Utils] Staggering={:08X} ", actor ? actor->GetFormID() : 0);
+    //         ApplySpell(a_defender, actor, hooks::timedBlockStaggerSpell);
+    //         return RE::BSContainer::ForEachResult::kContinue;
+    //     });
+    // }   
 
     inline static bool hasMGEF(RE::Actor* actor, RE::EffectSetting* a_effect) {
         if (!actor || !a_effect) {
@@ -96,11 +96,11 @@ namespace utils {
     }
 
     //overrides the magnitude of SimpleTimedBlockTweaked.esp~0x809's 0x808 MGEF (first instance). 0.0f means disabled.
-    inline static void overrideStaggerMagnitude(float overrideMag) {
-        if (overrideMag <= 0.0f) {
-            return;
-        }
-        auto* effect = FindEffect(hooks::STBLTweakedStaggerSpell, hooks::STBLTweakedStaggerMGEF);
-        effect->SetMagnitude(overrideMag);
-    }
+    // inline static void overrideStaggerMagnitude(float overrideMag) {
+    //     if (overrideMag <= 0.0f) {
+    //         return;
+    //     }
+    //     auto* effect = FindEffect(hooks::STBLTweakedStaggerSpell, hooks::STBLTweakedStaggerMGEF);
+    //     effect->SetMagnitude(overrideMag);
+    // }
 }

@@ -17,7 +17,7 @@ namespace form_config {
         constexpr auto defaultStaggerSpell = "EldenParryRemake.esp ~ 0x801";
         constexpr auto defaultAOEStaggerSpell = "EldenParryRemake.esp ~ 0x802";
         constexpr auto defaultBasherSpell = "EldenParryRemake.esp ~ 0x803";
-        
+
         constexpr auto defaultSFXshield = "EldenParry.esp ~ 0xD62";
         constexpr auto defaultSFXweapon = "EldenParry.esp ~ 0xD63";
 
@@ -88,22 +88,6 @@ namespace form_config {
             return form;
         }
 
-        PerkRequirement loadPerkRequirement(std::string_view setting, std::string_view context) {
-            setting = trim(setting);
-            if (setting.empty()) {
-                SKSE::log::info("[perk requirement] {} is unrestricted", context);
-                return {};
-            }
-
-            auto* perk = loadForm<RE::BGSPerk>(setting, context);
-            if (!perk) {
-                SKSE::log::error("[perk requirement] Invalid {} requirement; no perk will be required", context);
-                return {};
-            }
-
-            return { perk, true };
-        }
-
         bool createDefaults() {
             CSimpleIniA ini;
             ini.SetUnicode(false);
@@ -123,13 +107,6 @@ namespace form_config {
         const char* readSetting(const CSimpleIniA& ini, const char* section, const char* key, const char* fallback = "") {
             return ini.GetValue(section, key, fallback);
         }
-
-        const char* readPerkSetting(const CSimpleIniA& ini, const char* key, const char* legacyKey) {
-            if (const auto* value = ini.GetValue(perkSection, key, nullptr)) {
-                return value;
-            }
-            return ini.GetValue(perkSection, legacyKey, "");
-        }
     }
 
     bool Load() {
@@ -146,35 +123,16 @@ namespace form_config {
         }
 
         Config loaded{};
-        loaded.core.EP_Spell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_AttackerSpell", defaultAttackerSpell), "Core/EP_AttackerSpell");
+        loaded.core.EP_AttackerSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_AttackerSpell", defaultAttackerSpell), "Core/EP_AttackerSpell");
         loaded.core.EP_StaggerSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_StaggerSpell", defaultStaggerSpell), "Core/EP_StaggerSpell");
         loaded.core.EP_AOEStaggerSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_AOEStaggerSpell", defaultAOEStaggerSpell), "Core/EP_AOEStaggerSpell");
-        loaded.core.EP_BuffSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_BasherSpell", defaultBasherSpell), "Core/EP_BasherSpell");
-        loaded.core.SFXshield = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXShield", defaultSFXshield), "Core/EP_SFXShield");
-        loaded.core.SFXweapon = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXWeapon", defaultSFXweapon), "Core/EP_SFXWeapon");
-
-        // loaded.perks.shield.melee = loadPerkRequirement(readPerkSetting(ini, "ShieldMelee", "Melee"), "shield melee");
-        // loaded.perks.shield.spell = loadPerkRequirement(readPerkSetting(ini, "ShieldSpell", "Spell"), "shield spell");
-        // loaded.perks.shield.arrow = loadPerkRequirement(readPerkSetting(ini, "ShieldArrow", "Arrow"), "shield arrow");
-        // loaded.perks.nonShield.melee = loadPerkRequirement(readPerkSetting(ini, "NonShieldMelee", "Melee"), "non-shield melee");
-        // loaded.perks.nonShield.spell = loadPerkRequirement(readPerkSetting(ini, "NonShieldSpell", "Spell"), "non-shield spell");
-        // loaded.perks.nonShield.arrow = loadPerkRequirement(readPerkSetting(ini, "NonShieldArrow", "Arrow"), "non-shield arrow");
-        // loaded.perks.stagger = loadPerkRequirement(readSetting(ini, perkSection, "Stagger"), "AOE stagger");
-
-        // loaded.reflectionPerks.shield.spell = loadPerkRequirement(readSetting(ini, reflectionPerkSection, "ShieldSpell"), "shield spell reflection");
-        // loaded.reflectionPerks.shield.arrow = loadPerkRequirement(readSetting(ini, reflectionPerkSection, "ShieldArrow"), "shield arrow reflection");
-        // loaded.reflectionPerks.nonShield.spell = loadPerkRequirement(readSetting(ini, reflectionPerkSection, "NonShieldSpell"), "non-shield spell reflection");
-        // loaded.reflectionPerks.nonShield.arrow = loadPerkRequirement(readSetting(ini, reflectionPerkSection, "NonShieldArrow"), "non-shield arrow reflection");
-
-        // if (!loaded.core.parrySpell || !loaded.core.parryWindow || !loaded.core.staggerSpell ||
-        //     !loaded.core.timeBlockBuffSpell ||
-        //     !loaded.core.timedBlockExplosion || !loaded.core.timedBlockSound) {
-        //     SKSE::log::critical("[forms] One or more required [Core] forms could not be loaded");
-        //     return false;
-        // }
+        loaded.core.EP_BasherSpell = loadForm<RE::SpellItem>(readSetting(ini, coreSection, "EP_BasherSpell", defaultBasherSpell), "Core/EP_BasherSpell");
+        loaded.core.EP_SFXShield = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXShield", defaultSFXshield), "Core/EP_SFXShield");
+        loaded.core.EP_SFXWeapon = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXWeapon", defaultSFXweapon), "Core/EP_SFXWeapon");
 
         activeConfig = loaded;
         SKSE::log::info("[forms] Loaded {}", requirementsPath);
+        
         return true;
     }
 
