@@ -110,8 +110,9 @@ class hooks {
             if (!victim->IsPlayerRef() && !cfg.enableNPCParry) return false;
             const auto attackerState = attacker->AsActorState()->GetAttackState();
             const auto victimState = victim->AsActorState()->GetAttackState();
-            const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing || attackerState == RE::ATTACK_STATE_ENUM::kHit;
+            // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing || attackerState == RE::ATTACK_STATE_ENUM::kHit;
             // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing;
+            const bool attackerSwinging = attackerState <= RE::ATTACK_STATE_ENUM::kHit;
             const bool victimBashing = victimState == RE::ATTACK_STATE_ENUM::kBash;
             if (!cfg.enablePowerBashParry) {
                 if (victim->IsPowerAttacking()) return false;
@@ -121,7 +122,6 @@ class hooks {
                     static_cast<std::uint32_t>(attackerState), static_cast<std::uint32_t>(victimState));
             }
             if (victimBashing && attackerSwinging) {
-                SKSE::log::info("[attemptParry] defender bashing, attacker swinging, checking parry");
                 const bool hasDelay = utils::hasMGEF(victim, parryDelayEffect);
                 const bool hasWindow = utils::hasMGEF(victim, parryWindowEffect);
                 if (cfg.log) {
@@ -129,7 +129,7 @@ class hooks {
                         attacker->GetFormID(), victim->GetFormID(), hasDelay, hasWindow);
                 }
                 if (!hasDelay && hasWindow) {
-                    SKSE::log::info("[attemptParry] Successful parry");
+                    if (cfg.log) SKSE::log::info("[attemptParry] Successful parry");
                     playParryEffects(victim);
                     if (attacker) {
                         utils::ApplySpell(victim, attacker, loadedForms.core.EP_AttackerSpell);
