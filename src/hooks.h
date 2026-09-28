@@ -45,9 +45,9 @@ class hooks {
 			_ProcessHit = trampoline.write_call<5>(RELOCATION_ID(37650, 38603).address() + REL::Relocate(0x38B, 0x45A), processHit); // SE:627930 + 38B AE:64D350 + 40A / 45A
 			SKSE::log::info("Melee Hit hook installed."); 
             
-            // _arrowCollission = arrowProjectileVtbl.write_vfunc(190, OnArrowCollision);
-			// _missileCollission = missileProjectileVtbl.write_vfunc(190, OnMissileCollision);
-            // SKSE::log::info("Ranged Hooks installed");
+            _arrowCollission = arrowProjectileVtbl.write_vfunc(190, OnArrowCollision);
+			_missileCollission = missileProjectileVtbl.write_vfunc(190, OnMissileCollision);
+            SKSE::log::info("Ranged Hooks installed");
             auto* api = static_cast<PRECISION_API::IVPrecision1*>(PRECISION_API::RequestPluginAPI(PRECISION_API::InterfaceVersion::V4));
 
             if (api) {
@@ -276,8 +276,7 @@ class hooks {
 	        const bool inBlockAngle = (angle <= _GMST_fCombatHitConeAngle && angle >= -_GMST_fCombatHitConeAngle);
 
             const auto parryState = a_parrier->AsActorState()->GetAttackState();
-            const bool isParrying = false;
-            //if powerbash enabled and powerbashing or if not bashing: cannot parry projectile
+            const bool isParrying = !utils::hasMGEF(a_parrier, parryDelayEffect) && utils::hasMGEF(a_parrier, parryWindowEffect);
             if ((!cfg.enablePowerBashParry && a_parrier->IsPowerAttacking()) || parryState != RE::ATTACK_STATE_ENUM::kBash) {
                 return false;
             }
@@ -317,19 +316,22 @@ class hooks {
         static bool shouldIgnoreHit(RE::Projectile* a_projectile, RE::hkpAllCdPointCollector* a_AllCdPointCollector) {
 			if (a_AllCdPointCollector) {
                 const auto cfg = settings::Get();
+				const bool deflectionEnabled = a_projectile->GetProjectileRuntimeData().spell
+				    ? cfg.bEnableMagicProjectileDeflection
+				    : (a_projectile->GetFormType() == RE::FormType::ProjectileArrow && cfg.bEnableArrowProjectileDeflection);
 				for (auto& hit : a_AllCdPointCollector->hits) {
 					auto refrA = RE::TESHavokUtilities::FindCollidableRef(*hit.rootCollidableA);
 					auto refrB = RE::TESHavokUtilities::FindCollidableRef(*hit.rootCollidableB);
 					if (refrA && refrA->formType == RE::FormType::ActorCharacter && refrA->As<RE::Actor>()->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
 						if (refrA->IsPlayerRef() || cfg.enableNPCParry) {
-							if ((a_projectile->GetProjectileRuntimeData().spell && cfg.bEnableMagicProjectileDeflection) || cfg.bEnableArrowProjectileDeflection) {
+							if (deflectionEnabled) {
 								return processProjectileParry(refrA->As<RE::Actor>(), a_projectile, const_cast<RE::hkpCollidable*>(hit.rootCollidableB));
 							}
 						}
 					}
 					if (refrB && refrB->formType == RE::FormType::ActorCharacter && refrB->As<RE::Actor>()->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
 						if (refrB->IsPlayerRef() || cfg.enableNPCParry) {
-							if ((a_projectile->GetProjectileRuntimeData().spell && cfg.bEnableMagicProjectileDeflection) || cfg.bEnableArrowProjectileDeflection) {
+							if (deflectionEnabled) {
 								return processProjectileParry(refrB->As<RE::Actor>(), a_projectile, const_cast<RE::hkpCollidable*>(hit.rootCollidableA));
 							}
 						}
@@ -340,16 +342,16 @@ class hooks {
 		}
 
         static void OnArrowCollision(RE::Projectile* a_this, RE::hkpAllCdPointCollector* a_AllCdPointCollector) {
-			// if (shouldIgnoreHit(a_this, a_AllCdPointCollector)) {
-			// 	return;
-			// };
+			if (shouldIgnoreHit(a_this, a_AllCdPointCollector)) {
+				return;
+			}
 			_arrowCollission(a_this, a_AllCdPointCollector);
 		}
 
 		static void OnMissileCollision(RE::Projectile* a_this, RE::hkpAllCdPointCollector* a_AllCdPointCollector) {
-			// if (shouldIgnoreHit(a_this, a_AllCdPointCollector)) {
-			// 	return;
-			// };
+			if (shouldIgnoreHit(a_this, a_AllCdPointCollector)) {
+				return;
+			}
 			_missileCollission(a_this, a_AllCdPointCollector);
         }
 
