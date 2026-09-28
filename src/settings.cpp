@@ -173,7 +173,7 @@ namespace settings {
             SKSE::log::warn("[settings] SKSE Menu Framework DLL exists but is not loaded");
             return;
         }
-        SKSEMenuFramework::SetSection("EldenParryRemake");
+        SKSEMenuFramework::SetSection("Elden Parry");
         SKSEMenuFramework::AddSectionItem("Settings", RenderMenuPage);
         SKSE::log::info("[settings] Registered SKSE Menu Framework page");
     }

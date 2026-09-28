@@ -5,13 +5,14 @@ namespace settings {
         bool log = true;
 
         //bashing is valid if (!delay and window)
-        float delay = 0.02f; 
-        float window = 0.36f; 
+        float delay = 0.08f; 
+        float window = 0.24f; 
         float staggerMagnitude = 1.0f;
 
         bool enablePowerBashParry = false;
         bool enableNPCParry = false;
         bool enableAOEStagger = false;
+        float AOEStaggerRadius = 128.0f;
         bool bEnableArrowProjectileDeflection = true;
         bool bEnableMagicProjectileDeflection = true;
 
@@ -30,6 +31,7 @@ namespace settings {
         setting_definition<float>{ "staggerMagnitude", &settings::config::staggerMagnitude },
         setting_definition<bool>{ "enablePowerBashParry", &settings::config::enablePowerBashParry },
         setting_definition<bool>{ "enableAOEStagger", &settings::config::enableAOEStagger },
+        setting_definition<float>{ "AOEStaggerRadius", &settings::config::AOEStaggerRadius },
         setting_definition<bool>{ "enableNPCParry", &settings::config::enableNPCParry },
         setting_definition<bool>{ "bEnableArrowProjectileDeflection", &settings::config::bEnableArrowProjectileDeflection },
         setting_definition<bool>{ "bEnableMagicProjectileDeflection", &settings::config::bEnableMagicProjectileDeflection },

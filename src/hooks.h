@@ -89,6 +89,15 @@ class hooks {
         }
 
     private:
+        static void playParryEffects(RE::Actor* actor) {
+            utils::ApplySpell(actor, actor, loadedForms.core.EP_BasherSpell);
+            if (utils::isShield(actor)) {
+                utils::play_sound(actor, loadedForms.core.EP_SFXWeapon);
+            } else {
+                utils::play_sound(actor, loadedForms.core.EP_SFXWeapon);
+            }
+        }
+
         //melee
         static bool attemptParry(RE::Actor* attacker, RE::Actor* victim) {
             if (!attacker || !victim) return false;
@@ -116,13 +125,7 @@ class hooks {
                 }
                 if (!hasDelay && hasWindow) {
                     SKSE::log::info("[attemptParry] Successful parry");
-                    utils::ApplySpell(victim, victim, loadedForms.core.EP_BasherSpell);
-                    if (utils::isShield(victim)) {
-                        utils::play_sound(victim, loadedForms.core.EP_SFXWeapon);
-                    } else {
-                        utils::play_sound(victim, loadedForms.core.EP_SFXWeapon);
-                    }
-
+                    playParryEffects(victim);
                     if (attacker) {
                         utils::ApplySpell(victim, attacker, loadedForms.core.EP_AttackerSpell);
                         utils::overrideStaggerMagnitude(loadedForms.core.EP_StaggerSpell, loadedForms.core.EP_StaggerMGEF, cfg.staggerMagnitude);
@@ -201,20 +204,11 @@ class hooks {
             if (!actor->IsPlayerRef() && !cfg.enableNPCParry) {
                 return false;
             }
-            // if (!cfg.enablePowerBashParry && actor->IsPowerAttacking()) {
-            //     return false;
-            // }
 
             utils::applyMGEFDuration(parryDelayEffect, cfg.delay);
             utils::applyMGEFDuration(parryWindowEffect, cfg.window);
             utils::ApplySpell(actor, actor, parryDelaySpell);
             utils::ApplySpell(actor, actor, parryWindowSpell);
-            // if (cfg.log) {
-            //     const auto* effect = utils::FindEffect(parryWindowSpell, parryWindowEffect);
-            //     SKSE::log::info("[applyParryWindow] actor={:08X} castRequested={} spellContainsWindowEffect={} effectDuration={}s activeNow={}",
-            //         actor->GetFormID(), castRequested, effect != nullptr,
-            //         effect ? effect->effectItem.duration : 0u, utils::hasMGEF(actor, parryWindowEffect));
-            // }
             return true;
         }
 
@@ -270,6 +264,80 @@ class hooks {
             handleEvent(a_event);
             return _originalPC(a_sink, a_event, a_eventSource);
         }
+
+        //adapted from https://github.com/doodlum/EldenParry/blob/f6bd72eed354a54058805694f7adaecf24a8e0fa/src/EldenParry.cpp
+        static bool canParryProjectile(RE::Actor* a_parrier, RE::TESObjectREFR* a_obj) {
+            const auto cfg = settings::Get();
+            if (cfg.log) {
+                SKSE::log::info("[canParryProjectile] {} attempting to parry projectile", a_parrier->GetName());
+            }
+
+            auto angle = a_parrier->GetHeadingAngle(a_obj->GetPosition(), false);
+	        const bool inBlockAngle = (angle <= _GMST_fCombatHitConeAngle && angle >= -_GMST_fCombatHitConeAngle);
+
+            const auto parryState = a_parrier->AsActorState()->GetAttackState();
+            const bool isParrying = false;
+            //if powerbash enabled and powerbashing or if not bashing: cannot parry projectile
+            if ((!cfg.enablePowerBashParry && a_parrier->IsPowerAttacking()) || parryState != RE::ATTACK_STATE_ENUM::kBash) {
+                return false;
+            }
+            return isParrying && inBlockAngle;
+        }
+
+        static bool processProjectileParry(RE::Actor* a_parrier, RE::Projectile* a_projectile, RE::hkpCollidable* a_projectile_collidable) {
+            if (canParryProjectile(a_parrier, a_projectile)) {
+                RE::TESObjectREFR* shooter = nullptr;
+                if (a_projectile->GetProjectileRuntimeData().shooter && a_projectile->GetProjectileRuntimeData().shooter.get()) {
+                    shooter = a_projectile->GetProjectileRuntimeData().shooter.get().get();
+                }
+
+                utils::resetProjectileOwner(a_projectile, a_parrier, a_projectile_collidable);
+
+                if (shooter && shooter->Is3DLoaded()) {
+                    utils::RetargetProjectile(a_projectile, shooter);
+                } else {
+                    utils::ReflectProjectile(a_projectile);
+                }
+                
+                playParryEffects(a_parrier);
+                // if (a_parrier->IsPlayerRef()) {
+                //     RE::PlayerCharacter::GetSingleton()->AddSkillExperience(RE::ActorValue::kBlock, Settings::fProjectileParryExp);
+                // }
+                // if (Settings::bSuccessfulParryNoCost) {
+                //     negateParryCost(a_parrier);
+                // }
+                // send_ranged_parry_event();
+                return true;
+            }
+            return false;
+
+        }
+
+        //taken from: https://github.com/doodlum/EldenParry/blob/main/src/Hooks.h
+        static bool shouldIgnoreHit(RE::Projectile* a_projectile, RE::hkpAllCdPointCollector* a_AllCdPointCollector) {
+			if (a_AllCdPointCollector) {
+                const auto cfg = settings::Get();
+				for (auto& hit : a_AllCdPointCollector->hits) {
+					auto refrA = RE::TESHavokUtilities::FindCollidableRef(*hit.rootCollidableA);
+					auto refrB = RE::TESHavokUtilities::FindCollidableRef(*hit.rootCollidableB);
+					if (refrA && refrA->formType == RE::FormType::ActorCharacter && refrA->As<RE::Actor>()->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
+						if (refrA->IsPlayerRef() || cfg.enableNPCParry) {
+							if ((a_projectile->GetProjectileRuntimeData().spell && cfg.bEnableMagicProjectileDeflection) || cfg.bEnableArrowProjectileDeflection) {
+								return processProjectileParry(refrA->As<RE::Actor>(), a_projectile, const_cast<RE::hkpCollidable*>(hit.rootCollidableB));
+							}
+						}
+					}
+					if (refrB && refrB->formType == RE::FormType::ActorCharacter && refrB->As<RE::Actor>()->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
+						if (refrB->IsPlayerRef() || cfg.enableNPCParry) {
+							if ((a_projectile->GetProjectileRuntimeData().spell && cfg.bEnableMagicProjectileDeflection) || cfg.bEnableArrowProjectileDeflection) {
+								return processProjectileParry(refrB->As<RE::Actor>(), a_projectile, const_cast<RE::hkpCollidable*>(hit.rootCollidableA));
+							}
+						}
+					}
+				}
+			}
+			return false;
+		}
 
         static void OnArrowCollision(RE::Projectile* a_this, RE::hkpAllCdPointCollector* a_AllCdPointCollector) {
 			// if (shouldIgnoreHit(a_this, a_AllCdPointCollector)) {
