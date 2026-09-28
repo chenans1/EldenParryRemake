@@ -27,11 +27,11 @@ class hooks {
             }
             SKSE::log::info("Player->NotifyAnimationGraph() Hooked");
 
-            // {
-            //     REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[3]};
-            //     _original_NPC_notify = vtblNPC.write_vfunc(0x1, NPC_NotifyAnimationGraph);
-            // }
-            // SKSE::log::info("NPC->NotifyAnimationGraph() Hooked");
+            {
+                REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[3]};
+                _original_NPC_notify = vtblNPC.write_vfunc(0x1, NPC_NotifyAnimationGraph);
+            }
+            SKSE::log::info("NPC->NotifyAnimationGraph() Hooked");
             
             //process event hooks. both must be done.
             REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[2]};
@@ -92,10 +92,18 @@ class hooks {
         //melee
         static bool attemptParry(RE::Actor* attacker, RE::Actor* victim) {
             if (!attacker || !victim) return false;
-            // if (attacker->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kSwing) {
-            if (attacker->IsAttacking()) {
-                SKSE::log::info("[attemptParry] Attacker IsAttacking, checking parry");
-                const auto cfg = settings::Get();
+            const auto cfg = settings::Get();
+            if (!victim->IsPlayerRef() && !cfg.enableNPCParry) return false;
+            const auto attackerState = attacker->AsActorState()->GetAttackState();
+            const auto victimState = victim->AsActorState()->GetAttackState();
+            const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing || attackerState == RE::ATTACK_STATE_ENUM::kHit;
+            const bool victimBashing = victimState == RE::ATTACK_STATE_ENUM::kBash;
+            if (cfg.log) {
+                SKSE::log::info("[attemptParry] attackerState={} victimState={}",
+                    static_cast<std::uint32_t>(attackerState), static_cast<std::uint32_t>(victimState));
+            }
+            if (victimBashing && attackerSwinging) {
+                SKSE::log::info("[attemptParry] defender bashing, attacker swinging, checking parry");
                 const bool hasDelay = utils::hasMGEF(victim, parryDelayEffect);
                 const bool hasWindow = utils::hasMGEF(victim, parryWindowEffect);
                 if (cfg.log) {
@@ -124,11 +132,24 @@ class hooks {
 
         static PRECISION_API::PreHitCallbackReturn OnPrecisionPreHit(const PRECISION_API::PrecisionHitData& hit) {
             PRECISION_API::PreHitCallbackReturn result{};
-            auto* victim = hit.target ? hit.target->As<RE::Actor>() : nullptr;
-            if (hit.attacker && victim && settings::Get().log) {
-                SKSE::log::info("[Precision pre-hit] attacker={:08X} victim={:08X}",
-                    hit.attacker->GetFormID(), victim->GetFormID());
+            const auto cfg = settings::Get();
+            //remove attacker prec hitframe
+            if (hit.attacker && hit.attacker->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
+                if (!hit.attacker->IsPlayerRef() && !cfg.enableNPCParry){
+                    return result;
+                }
+                if (cfg.log) SKSE::log::info("[Precision pre-hit] Ignoring bash hit from {:08X}", hit.attacker->GetFormID());
+                result.bIgnoreHit = true;
+                return result;
             }
+            auto* victim = hit.target ? hit.target->As<RE::Actor>() : nullptr;
+            if (!hit.attacker || !victim) {
+                return result;
+            }
+            if (cfg.log) SKSE::log::info("[Precision pre-hit] attacker={:08X} victim={:08X}", hit.attacker->GetFormID(), victim->GetFormID());
+            if (!victim->IsPlayerRef() && !cfg.enableNPCParry){
+                    return result;
+                }
             if (hit.attacker && victim && attemptParry(hit.attacker, victim)) {
                 result.bIgnoreHit = true;
             }
@@ -137,17 +158,22 @@ class hooks {
 
         //melee collision hook. same as the original. 
         static void processHit(RE::Actor* a_aggressor, RE::Actor* a_victim, std::int64_t a_int1, bool a_bool, void* a_unkptr) {
-            if (a_aggressor && a_victim && settings::Get().log) {
-                SKSE::log::info("[vanilla melee hit] attacker={:08X} victim={:08X}",
+            const auto cfg = settings::Get();
+            if (a_aggressor && a_victim && cfg.log) {
+                SKSE::log::info("[processHit] attacker={:08X} victim={:08X}",
                     a_aggressor->GetFormID(), a_victim->GetFormID());
             }
-            //remove aggressor hitframe
+            //remove aggressor bash hitframe
             if (a_aggressor->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
-                SKSE::log::info("[processHit] a_aggressor bashing hitframe cancel");
+                if (!a_aggressor->IsPlayerRef() && !cfg.enableNPCParry) {
+                    return _ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
+                }
+                if (cfg.log) SKSE::log::info("[processHit] a_aggressor bashing hitframe cancel");
                 return;
             }
+            //doesn't fire off with precision installed
 			if (attemptParry(a_aggressor, a_victim)) {
-                SKSE::log::info("[processHit] Successful Parry");
+                if (cfg.log) SKSE::log::info("[processHit] Successful Parry");
                 return;
             }
 			_ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
@@ -158,17 +184,21 @@ class hooks {
                 return false;
             }
             const auto cfg = settings::Get();
+            if (!actor->IsPlayerRef() && !cfg.enableNPCParry) {
+                return false;
+            }
+
             utils::applyMGEFDuration(parryDelayEffect, cfg.delay);
             utils::applyMGEFDuration(parryWindowEffect, cfg.window);
-            // utils::ApplySpell(actor, actor, parryDelaySpell);
-            const bool castRequested = utils::ApplySpell(actor, actor, parryWindowSpell);
+            utils::ApplySpell(actor, actor, parryDelaySpell);
+            utils::ApplySpell(actor, actor, parryWindowSpell);
             // if (cfg.log) {
             //     const auto* effect = utils::FindEffect(parryWindowSpell, parryWindowEffect);
             //     SKSE::log::info("[applyParryWindow] actor={:08X} castRequested={} spellContainsWindowEffect={} effectDuration={}s activeNow={}",
             //         actor->GetFormID(), castRequested, effect != nullptr,
             //         effect ? effect->effectItem.duration : 0u, utils::hasMGEF(actor, parryWindowEffect));
             // }
-            return castRequested;
+            return true;
         }
 
         static bool PC_NotifyAnimationGraph(RE::IAnimationGraphManagerHolder* a_this, const RE::BSFixedString& a_eventName) {
@@ -193,7 +223,7 @@ class hooks {
                 return result;
             }
             if (a_eventName == bashRelease) {
-                SKSE::log::info("[NPC_NotifyAnimationGraph] bashRelease");
+                // SKSE::log::info("[NPC_NotifyAnimationGraph] bashRelease");
                 applyParryWindow(actor);
             }
             return result;
@@ -215,6 +245,7 @@ class hooks {
         }
 
         static RE::BSEventNotifyControl ProcessEvent_NPC(RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink, const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) {
+
             handleEvent(a_event);
             return _originalNPC(a_sink, a_event, a_eventSource);
         }

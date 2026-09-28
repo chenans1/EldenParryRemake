@@ -10,6 +10,7 @@ namespace settings {
         float staggerMagnitude = 1.0f;
 
         bool enableAOEStagger = false;
+        bool enableNPCParry = false;
         bool bEnableArrowProjectileDeflection = true;
         bool bEnableMagicProjectileDeflection = true;
 
@@ -27,6 +28,7 @@ namespace settings {
         setting_definition<float>{ "parryWindow", &settings::config::window },
         setting_definition<float>{ "staggerMagnitude", &settings::config::staggerMagnitude },
         setting_definition<bool>{ "enableAOEStagger", &settings::config::enableAOEStagger },
+        setting_definition<bool>{ "enableNPCParry", &settings::config::enableNPCParry },
         setting_definition<bool>{ "bEnableArrowProjectileDeflection", &settings::config::bEnableArrowProjectileDeflection },
         setting_definition<bool>{ "bEnableMagicProjectileDeflection", &settings::config::bEnableMagicProjectileDeflection },
     };
