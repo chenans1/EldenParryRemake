@@ -1,0 +1,49 @@
+#pragma once
+
+#include "RE/B/BSPathingCell.h"
+
+namespace RE
+{
+	class PathingCell : public BSPathingCell
+	{
+	public:
+		struct PathingCellInfo
+		{
+			union CellFormID
+			{
+				constexpr CellFormID() :
+					formID(0) {}
+
+				FormID formID;
+				CellID coordinates;
+			};
+
+			constexpr PathingCellInfo() :
+				worldSpaceID(0){};
+
+			FormID     worldSpaceID;
+			CellFormID cellID;
+		};
+
+		inline static constexpr auto RTTI = RTTI_PathingCell;
+		inline static constexpr auto VTABLE = VTABLE_PathingCell;
+
+		virtual ~PathingCell();  // 00
+
+		// override (BSPathingCell)
+		virtual std::uint32_t GetType() const override;                                             // 01 - "PathingCell"
+		virtual void          Unk_02(void) override;                                                // 02
+		virtual void          Unk_03(void) override;                                                // 03
+		virtual void          Unk_04(void) override;                                                // 04
+		virtual void          Unk_05(void) override;                                                // 05
+		virtual void          Unk_06(void) override;                                                // 06
+		virtual void          Unk_07(void) override;                                                // 07
+		virtual void          Unk_08(void) override;                                                // 08
+		virtual void          Unk_09(void) override;                                                // 09
+		virtual bool          IsInSameSpace(BSTSmartPointer<BSPathingCell>* a_otherCell) override;  // 0A
+
+		// members
+		PathingCellInfo pathingCellInfo;  // 10
+	};
+	static_assert(sizeof(PathingCell) == 0x18);
+}
