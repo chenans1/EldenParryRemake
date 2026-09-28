@@ -144,7 +144,7 @@ namespace settings {
         config cfg = Get();
         bool changed = false;
         // changed |= ImGuiMCP::Checkbox("Enable Sound Effects", &cfg.applyTimedBlockSFX);
-        ImGuiMCP::TextUnformatted("Times are measured from bash release.");
+        ImGuiMCP::TextUnformatted("Times are measured from bash start.");
         changed |= ImGuiMCP::SliderFloat("Parry Window Delay", &cfg.delay, 0.0f, 1.0f, "%.2f");
 
         const float clampedWindow = std::clamp(cfg.window, cfg.delay, cfg.delay + 1.0f);

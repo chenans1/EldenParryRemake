@@ -5,6 +5,10 @@
 #include "utils.h"
 #include "extern/PrecisionAPI.h"
 
+#include <mutex>
+#include <unordered_map>
+#include <unordered_set>
+
 
 class hooks {
     public:
@@ -34,12 +38,12 @@ class hooks {
             SKSE::log::info("NPC->NotifyAnimationGraph() Hooked");
             
             //process event hooks. both must be done.
-            REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[2]};
-            REL::Relocation<std::uintptr_t> vtblPC{RE::VTABLE_PlayerCharacter[2]};
+            // REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[2]};
+            // REL::Relocation<std::uintptr_t> vtblPC{RE::VTABLE_PlayerCharacter[2]};
 
-            _originalNPC = vtblNPC.write_vfunc(0x1, ProcessEvent_NPC);
-            _originalPC = vtblPC.write_vfunc(0x1, ProcessEvent_PC);
-            SKSE::log::info("Installed PC & NPC processEvent() Hooks");
+            // _originalNPC = vtblNPC.write_vfunc(0x1, ProcessEvent_NPC);
+            // _originalPC = vtblPC.write_vfunc(0x1, ProcessEvent_PC);
+            // SKSE::log::info("Installed PC & NPC processEvent() Hooks");
 
             auto& trampoline = SKSE::GetTrampoline();
 			_ProcessHit = trampoline.write_call<5>(RELOCATION_ID(37650, 38603).address() + REL::Relocate(0x38B, 0x45A), processHit); // SE:627930 + 38B AE:64D350 + 40A / 45A
@@ -102,44 +106,86 @@ class hooks {
             }
         }
 
-        //melee
-        static bool attemptParry(RE::Actor* attacker, RE::Actor* victim) {
-            if (!attacker || !victim) return false;
+        // Check the current collision without applying any effects.
+        static bool canParry(RE::Actor* attacker, RE::Actor* defender) {
+            if (!attacker || !defender) return false;
             const auto cfg = settings::Get();
-            if (!parryStyleEnabled(victim, cfg)) return false;
-            if (!victim->IsPlayerRef() && !cfg.enableNPCParry) return false;
+            if (!parryStyleEnabled(defender, cfg)) return false;
+            if (!defender->IsPlayerRef() && !cfg.enableNPCParry) return false;
             const auto attackerState = attacker->AsActorState()->GetAttackState();
-            const auto victimState = victim->AsActorState()->GetAttackState();
+            const auto defenderState = defender->AsActorState()->GetAttackState();
             // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing || attackerState == RE::ATTACK_STATE_ENUM::kHit;
-            // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing;
-            const bool attackerSwinging = attackerState <= RE::ATTACK_STATE_ENUM::kHit;
-            const bool victimBashing = victimState == RE::ATTACK_STATE_ENUM::kBash;
-            if (!cfg.enablePowerBashParry) {
-                if (victim->IsPowerAttacking()) return false;
-            }
+            const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing;
+            const bool defenderBashing = defenderState == RE::ATTACK_STATE_ENUM::kBash;
+            if (!cfg.enablePowerBashParry && defender->IsPowerAttacking()) return false;
             if (cfg.log) {
-                SKSE::log::info("[attemptParry] attackerState={} victimState={}",
-                    static_cast<std::uint32_t>(attackerState), static_cast<std::uint32_t>(victimState));
+                SKSE::log::info("[canParry] attackerState={} defenderState={}",
+                    static_cast<std::uint32_t>(attackerState), static_cast<std::uint32_t>(defenderState));
             }
-            if (victimBashing && attackerSwinging) {
-                const bool hasDelay = utils::hasMGEF(victim, parryDelayEffect);
-                const bool hasWindow = utils::hasMGEF(victim, parryWindowEffect);
+            if (defenderBashing && attackerSwinging) {
+                const bool hasDelay = utils::hasMGEF(defender, parryDelayEffect);
+                const bool hasWindow = utils::hasMGEF(defender, parryWindowEffect);
                 if (cfg.log) {
-                    SKSE::log::info("[attemptParry] attacker={:08X} victim={:08X} delayEffect={} windowEffect={}",
-                        attacker->GetFormID(), victim->GetFormID(), hasDelay, hasWindow);
+                    SKSE::log::info("[canParry] attacker={:08X} defender={:08X} delayEffect={} windowEffect={}",
+                        attacker->GetFormID(), defender->GetFormID(), hasDelay, hasWindow);
                 }
-                if (!hasDelay && hasWindow) {
-                    if (cfg.log) SKSE::log::info("[attemptParry] Successful parry");
-                    playParryEffects(victim);
-                    if (attacker) {
-                        utils::ApplySpell(victim, attacker, loadedForms.core.EP_AttackerSpell);
-                        utils::overrideStaggerMagnitude(loadedForms.core.EP_StaggerSpell, loadedForms.core.EP_StaggerMGEF, cfg.staggerMagnitude);
-                        utils::ApplySpell(victim, attacker, loadedForms.core.EP_StaggerSpell);
-                    }
-                    return true;
-                }
+                return !hasDelay && hasWindow;
             }
             return false;
+        }
+
+        static void applyParryEffects(RE::Actor* defender, RE::Actor* attacker) {
+            const auto cfg = settings::Get();
+            if (cfg.log) SKSE::log::info("[parry] effects defender={:08X} attacker={:08X}", defender->GetFormID(), attacker->GetFormID());
+            playParryEffects(defender);
+            utils::ApplySpell(defender, attacker, loadedForms.core.EP_AttackerSpell);
+            utils::overrideStaggerMagnitude(loadedForms.core.EP_StaggerSpell, loadedForms.core.EP_StaggerMGEF, cfg.staggerMagnitude);
+            utils::ApplySpell(defender, attacker, loadedForms.core.EP_StaggerSpell);
+        }
+
+        static void queueParryEffects(RE::Actor* defender, RE::Actor* attacker) {
+            const auto defenderHandle = defender->GetHandle();
+            const auto attackerHandle = attacker->GetHandle();
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                tasks->AddTask([defenderHandle, attackerHandle]() {
+                    auto resolvedDefender = defenderHandle.get();
+                    auto resolvedAttacker = attackerHandle.get();
+                    if (resolvedDefender && resolvedAttacker) {
+                        applyParryEffects(resolvedDefender.get(), resolvedAttacker.get());
+                    }
+                });
+            } else {
+                SKSE::log::error("[parry] task interface unavailable; effects were not applied");
+            }
+        }
+
+        // Both directional collisions can arrive in either order. Remember a successful
+        // pair for this bash so only the attacker hit is suppressed and effects run once.
+        static bool resolveParry(RE::Actor* attacker, RE::Actor* defender) {
+            if (!attacker || !defender || defender->AsActorState()->GetAttackState() != RE::ATTACK_STATE_ENUM::kBash) {
+                return false;
+            }
+
+            bool firstCollision = false;
+            {
+                std::lock_guard lock(_parryHitsMutex);
+                const auto defenderID = defender->GetFormID();
+                const auto attackerID = attacker->GetFormID();
+                auto it = _parriedAttackers.find(defenderID);
+                if (it != _parriedAttackers.end() && it->second.contains(attackerID)) {
+                    return true;
+                }
+                if (!canParry(attacker, defender)) {
+                    return false;
+                }
+                _parriedAttackers[defenderID].insert(attackerID);
+                firstCollision = true;
+            }
+
+            if (firstCollision) {
+                queueParryEffects(defender, attacker);
+            }
+            return true;
         }
 
         static PRECISION_API::PreHitCallbackReturn OnPrecisionPreHit(const PRECISION_API::PrecisionHitData& hit) {
@@ -150,7 +196,10 @@ class hooks {
             }
             //remove attacker prec hitframe
             const auto attackerState = hit.attacker->AsActorState()->GetAttackState();
-
+            auto* victim = hit.target ? hit.target->As<RE::Actor>() : nullptr;
+            if (!victim) {
+                return result;
+            }
             if (attackerState == RE::ATTACK_STATE_ENUM::kBash) {
                 if (!parryStyleEnabled(hit.attacker, cfg)) return result;
                 if (!cfg.enablePowerBashParry) {
@@ -159,45 +208,53 @@ class hooks {
                 if (!hit.attacker->IsPlayerRef() && !cfg.enableNPCParry){
                     return result;
                 }
-                if (cfg.log) SKSE::log::info("[Precision pre-hit] Ignoring bash hit from {:08X}", hit.attacker->GetFormID());
-                result.bIgnoreHit = true;
+                if (resolveParry(victim, hit.attacker)) {
+                    if (cfg.log) SKSE::log::info("[Precision pre-hit] allowing parry bash hit attacker={:08X} target={:08X}", hit.attacker->GetFormID(), victim->GetFormID());
+                } else {
+                    result.bIgnoreHit = true;
+                    if (cfg.log) SKSE::log::info("[Precision pre-hit] ignoring bash hit attacker={:08X} target={:08X}", hit.attacker->GetFormID(), victim->GetFormID());
+                }
                 return result;
             }
-            auto* victim = hit.target ? hit.target->As<RE::Actor>() : nullptr;
-            if (!victim) {
-                return result;
-            }
+
             if (cfg.log) SKSE::log::info("[Precision pre-hit] attacker={:08X} victim={:08X}", hit.attacker->GetFormID(), victim->GetFormID());
 
             if (!victim->IsPlayerRef() && !cfg.enableNPCParry){
                 return result;
             }
-            if (attemptParry(hit.attacker, victim)) {
+            if (resolveParry(hit.attacker, victim)) {
                 result.bIgnoreHit = true;
+                if (cfg.log) SKSE::log::info("[Precision pre-hit] ignoring parried attack attacker={:08X} defender={:08X}", hit.attacker->GetFormID(), victim->GetFormID());
             }
             return result;
         }
 
         //melee collision hook. same as the original. 
         static void processHit(RE::Actor* a_aggressor, RE::Actor* a_victim, std::int64_t a_int1, bool a_bool, void* a_unkptr) {
+            if (!a_aggressor || !a_victim) {
+                return _ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
+            }
             const auto cfg = settings::Get();
             if (a_aggressor && a_victim && cfg.log) {
                 SKSE::log::info("[processHit] attacker={:08X} victim={:08X}",
                     a_aggressor->GetFormID(), a_victim->GetFormID());
             }
-            //remove aggressor bash hitframe
+            // Apply the same directional decision when Precision does not handle the hit.
             if (a_aggressor->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
                 if (!parryStyleEnabled(a_aggressor, cfg) ||
                     (!a_aggressor->IsPlayerRef() && !cfg.enableNPCParry) ||
                     (!cfg.enablePowerBashParry && a_aggressor->IsPowerAttacking())) {
                     return _ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
                 }
-                if (cfg.log) SKSE::log::info("[processHit] a_aggressor bashing hitframe cancel");
-                return;
+                if (!resolveParry(a_victim, a_aggressor)) {
+                    if (cfg.log) SKSE::log::info("[processHit] ignoring bash hit attacker={:08X} target={:08X}", a_aggressor->GetFormID(), a_victim->GetFormID());
+                    return;
+                }
+                if (cfg.log) SKSE::log::info("[processHit] allowing parry bash hit attacker={:08X} target={:08X}", a_aggressor->GetFormID(), a_victim->GetFormID());
+                return _ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
             }
-            //doesn't fire off with precision installed
-			if (attemptParry(a_aggressor, a_victim)) {
-                if (cfg.log) SKSE::log::info("[processHit] Successful Parry");
+            if (resolveParry(a_aggressor, a_victim)) {
+                if (cfg.log) SKSE::log::info("[processHit] ignoring parried attack attacker={:08X} defender={:08X}", a_aggressor->GetFormID(), a_victim->GetFormID());
                 return;
             }
 			_ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
@@ -206,6 +263,10 @@ class hooks {
         static bool applyParryWindow(RE::Actor* actor) {
             if (!actor) {
                 return false;
+            }
+            {
+                std::lock_guard lock(_parryHitsMutex);
+                _parriedAttackers.erase(actor->GetFormID());
             }
             const auto cfg = settings::Get();
             if (!parryStyleEnabled(actor, cfg)) {
@@ -224,34 +285,43 @@ class hooks {
 
         static bool PC_NotifyAnimationGraph(RE::IAnimationGraphManagerHolder* a_this, const RE::BSFixedString& a_eventName) {
             const bool result = _original_PC_Notify(a_this, a_eventName);
-            static const RE::BSFixedString bashRelease{ "bashRelease" }; 
+            static const RE::BSFixedString bashStart{ "bashStart" };
+            static const RE::BSFixedString bashRelease{ "bashRelease" };
             static auto* const player = RE::PlayerCharacter::GetSingleton();
 
-            if (a_eventName == bashRelease) {
-                SKSE::log::info("[PC_NotifyAnimationGraph] bashRelease");
+            if (a_eventName == bashStart) {
+                if (settings::Get().log) SKSE::log::info("[PC_NotifyAnimationGraph] bashStart actor={:08X}", player->GetFormID());
                 applyParryWindow(player);
-            }
+            } 
+            // else if (a_eventName == bashRelease && settings::Get().log) {
+            //     SKSE::log::info("[PC_NotifyAnimationGraph] bashRelease actor={:08X}", player->GetFormID());
+            // }
             return result;
         }
 
         static bool NPC_NotifyAnimationGraph(RE::IAnimationGraphManagerHolder* a_this, const RE::BSFixedString& a_eventName) {
             const bool result = _original_NPC_notify(a_this, a_eventName);
-            static const RE::BSFixedString bashRelease{ "bashRelease" }; 
+            static const RE::BSFixedString bashStart{ "bashStart" };
+            // static const RE::BSFixedString bashRelease{ "bashRelease" };
             // auto* refr = static_cast<RE::TESObjectREFR*>(a_this);
             auto* refr = SKSE::stl::adjust_pointer<RE::TESObjectREFR>(a_this, -0x38);
             auto* actor = refr ? refr->As<RE::Actor>() : nullptr;
             if (!actor) {
                 return result;
             }
-            if (a_eventName == bashRelease) {
-                // SKSE::log::info("[NPC_NotifyAnimationGraph] bashRelease");
+            if (a_eventName == bashStart) {
+                if (settings::Get().log) SKSE::log::info("[NPC_NotifyAnimationGraph] bashStart actor={:08X}", actor->GetFormID());
                 applyParryWindow(actor);
-            }
+            } 
+            // else if (a_eventName == bashRelease && settings::Get().log) {
+            //     SKSE::log::info("[NPC_NotifyAnimationGraph] bashRelease actor={:08X}", actor->GetFormID());
+            // }
             return result;
         }
 
         static void handleEvent(const RE::BSAnimationGraphEvent* a_event) {
-            static const  std::string_view bashRelease{ "bashRelease" }; 
+            static const std::string_view bashStart{ "bashStart" };
+            // static const std::string_view bashRelease{ "bashRelease" };
             if (!a_event || !a_event->holder || !a_event->tag.data()) return;
             auto* holder = const_cast<RE::TESObjectREFR*>(a_event->holder);
             if (!holder) return;
@@ -259,10 +329,13 @@ class hooks {
             if (!actor) return;
             const auto& tag = a_event->tag;
 
-            if (utils::compare(bashRelease, tag)) {
-                // if SKSE::log::info("[handleEvent] bashRelease");
+            if (utils::compare(bashStart, tag)) {
+                if (settings::Get().log) SKSE::log::info("[handleEvent] bashStart actor={:08X}", actor->GetFormID());
                 applyParryWindow(actor);
-            }
+            } 
+            // else if (utils::compare(bashRelease, tag) && settings::Get().log) {
+            //     SKSE::log::info("[handleEvent] bashRelease actor={:08X}", actor->GetFormID());
+            // }
         }
 
         static RE::BSEventNotifyControl ProcessEvent_NPC(RE::BSTEventSink<RE::BSAnimationGraphEvent>* a_sink, const RE::BSAnimationGraphEvent* a_event, RE::BSTEventSource<RE::BSAnimationGraphEvent>* a_eventSource) {
@@ -369,6 +442,8 @@ class hooks {
         }
 
 		static inline REL::Relocation<decltype(processHit)> _ProcessHit;
+        static inline std::mutex _parryHitsMutex;
+        static inline std::unordered_map<RE::FormID, std::unordered_set<RE::FormID>> _parriedAttackers;
         static inline REL::Relocation<decltype(OnArrowCollision)> _arrowCollission;
 		static inline REL::Relocation<decltype(OnMissileCollision)> _missileCollission;
         static inline REL::Relocation<decltype(PC_NotifyAnimationGraph)> _original_PC_Notify;
