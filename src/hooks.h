@@ -4,6 +4,11 @@
 
 class hooks {
     public:
+        static inline RE::SpellItem* parryDelaySpell = nullptr;
+        static inline RE::EffectSetting* parryDelayEffect = nullptr;
+        static inline RE::SpellItem* parryWindowSpell = nullptr;
+        static inline RE::EffectSetting* parryWindowEffect = nullptr;
+
         static void Install() {
             SKSE::log::info("Installing Hooks...");
             REL::Relocation<std::uintptr_t> arrowProjectileVtbl{ RE::VTABLE_ArrowProjectile[0] };
@@ -12,23 +17,50 @@ class hooks {
 			// _arrowCollission = arrowProjectileVtbl.write_vfunc(190, OnArrowCollision);
 			// _missileCollission = missileProjectileVtbl.write_vfunc(190, OnMissileCollision);
             // SKSE::log::info("Ranged Hooks installed");
-			auto& trampoline = SKSE::GetTrampoline();
-
+			
             {
                 REL::Relocation<uintptr_t> vtblPC{RE::VTABLE_PlayerCharacter[3]};
                 _original_PC_Notify = vtblPC.write_vfunc(0x1, PC_NotifyAnimationGraph);
             }
+            SKSE::log::info("Player->NotifyAnimationGraph() Hooked");
 
-            {
-                REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[3]};
-                _original_NPC_notify = vtblNPC.write_vfunc(0x1, NPC_NotifyAnimationGraph);
+            // {
+            //     REL::Relocation<std::uintptr_t> vtblNPC{RE::VTABLE_Character[3]};
+            //     _original_NPC_notify = vtblNPC.write_vfunc(0x1, NPC_NotifyAnimationGraph);
+            // }
+            // SKSE::log::info("NPC->NotifyAnimationGraph() Hooked");
+
+            // auto& trampoline = SKSE::GetTrampoline();
+            // SE:627930 + 38B AE:64D350 + 40A / 45A
+			// _ProcessHit = trampoline.write_call<5>(RELOCATION_ID(37650, 38603).address() + REL::Relocate(0x38B, 0x45A), processHit);
+			// SKSE::log::info("Melee Hit hook installed.");
+
+            SKSE::log::info("Finished Installing Hooks.");
+        }
+
+        static bool Load() {
+            if (!form_config::Load()) {
+                // SKSE::log::info("Finished Installing Hooks.");
+                return false;
             }
+            auto* dataHandler = RE::TESDataHandler::GetSingleton();
+            // const auto& configured = form_config::Get().core;
+            parryDelaySpell = dataHandler->LookupForm<RE::SpellItem>(0x808, "EldenParryRemake.esp");
+            parryDelayEffect = dataHandler->LookupForm<RE::EffectSetting>(0x80A, "EldenParryRemake.esp");
+            parryWindowSpell = dataHandler->LookupForm<RE::SpellItem>(0x809, "EldenParryRemake.esp");
+            parryWindowEffect = dataHandler->LookupForm<RE::EffectSetting>(0x80B, "EldenParryRemake.esp");
 
-            //SE:627930 + 38B AE:64D350 + 40A / 45A
-			_ProcessHit = trampoline.write_call<5>(RELOCATION_ID(37650, 38603).address() + REL::Relocate(0x38B, 0x45A), processHit);
-			SKSE::log::info("Melee Hit hook installed.");
-
-            SKSE::log::info("Finished Installing Hooks. ");
+            if (!parryDelaySpell|| !parryDelayEffect || !parryWindowSpell || !parryWindowEffect) {
+                SKSE::log::error("Failed to load effect forms: parryDelaySpell={}, parryDelayEffect={}, parryWindowSpell={}, parryWindowEffect={}", 
+                    static_cast<void*>(parryDelaySpell), 
+                    static_cast<void*>(parryDelayEffect), 
+                    static_cast<void*>(parryWindowSpell),
+                    static_cast<void*>(parryWindowEffect));
+                return false;
+            }
+            SKSE::log::info("Correctly loaded forms: parryDelaySpell={:08X}, parryDelayEffect={:08X}, parryWindowSpell={:08X}, parryWindowEffect={:08X}", 
+                    parryDelaySpell->GetFormID(), parryDelayEffect->GetFormID(), parryWindowSpell->GetFormID(), parryWindowEffect->GetFormID());
+            return true;
         }
 
     private:
@@ -54,15 +86,19 @@ class hooks {
 		}
 
         static bool PC_NotifyAnimationGraph(RE::IAnimationGraphManagerHolder* a_this, const RE::BSFixedString& a_eventName) {
+            static const RE::BSFixedString bashRelease{ "bashRelease" }; 
+            static const RE::BSFixedString bashStart{ "bashStart" }; 
+            
             static auto* const player = RE::PlayerCharacter::GetSingleton();
             const bool result = _original_PC_Notify(a_this, a_eventName);
             return result;
         }
 
-        static bool NPC_NotifyAnimationGraph(RE::IAnimationGraphManagerHolder* a_this,const RE::BSFixedString& a_eventName) {
+        static bool NPC_NotifyAnimationGraph(RE::IAnimationGraphManagerHolder* a_this, const RE::BSFixedString& a_eventName) {
             const bool result = _original_NPC_notify(a_this, a_eventName);
             return result;
         }
+
 		static inline REL::Relocation<decltype(processHit)> _ProcessHit;
         static inline REL::Relocation<decltype(OnArrowCollision)> _arrowCollission;
 		static inline REL::Relocation<decltype(OnMissileCollision)> _missileCollission;

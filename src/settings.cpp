@@ -143,8 +143,11 @@ namespace settings {
     void __stdcall RenderMenuPage() {
         config cfg = Get();
         bool changed = false;
-        // changed |= ImGuiMCP::SliderFloat("Timed Block Window", &cfg.timedBlockWindow, 0.0f, 1.0f, "%.2f");
         // changed |= ImGuiMCP::Checkbox("Enable Sound Effects", &cfg.applyTimedBlockSFX);
+        ImGuiMCP::TextUnformatted("Parry window is valid after the delay has elapsed.");
+        changed |= ImGuiMCP::SliderFloat("Parry Window Delay", &cfg.delay, 0.0f, 1.0f, "%.2f");
+        changed |= ImGuiMCP::SliderFloat("Parry Window Duration", &cfg.window, cfg.delay, cfg.delay+1.0f, "%.2f");
+        ImGuiMCP::Text("Valid Active window duration %.1f% - %.1f% = %.1f%", cfg.window, cfg.delay, cfg.window-cfg.delay);
 
         changed |= ImGuiMCP::Checkbox("Enable diagnostic logging", &cfg.log);
         FinishMenuPage(cfg, changed);

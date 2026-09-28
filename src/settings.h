@@ -3,7 +3,13 @@
 namespace settings {
     struct config {
         bool log = true;
-        
+
+        //bashing is valid if (!delay and window)
+        float delay = 0.0f; 
+        float window = 0.3f; 
+
+        bool enableAOEStagger = false;
+
     };
     
     template <class T>
@@ -14,7 +20,8 @@ namespace settings {
 
     constexpr auto setting_definitions = std::tuple{
         setting_definition<bool>{ "log", &settings::config::log },
-
+        setting_definition<float>{ "parryDelay", &settings::config::delay },
+        setting_definition<float>{ "parryWindow", &settings::config::window },
     };
 
     config Get();

@@ -57,9 +57,9 @@ SKSEPluginLoad(const SKSE::LoadInterface* skse) {
                 break;
             case SKSE::MessagingInterface::kDataLoaded:
                 settings::Load();
-                if (form_config::Load()) {
-                    // hooks::Install(); //for maxsu poise compat
+                if (hooks::Load()) {
                     log::info("EldenParryRemake: Loaded Forms");
+                    hooks::Install(); 
                 } else {
                     log::critical("Required forms could not be loaded; hooks will not be installed");
                 }
