@@ -89,6 +89,10 @@ class hooks {
         }
 
     private:
+        static bool parryStyleEnabled(const RE::Actor* actor, const settings::config& cfg) {
+            return utils::isShield(actor) ? cfg.bShieldEnabled : cfg.bNonShieldEnabled;
+        }
+
         static void playParryEffects(RE::Actor* actor) {
             utils::ApplySpell(actor, actor, loadedForms.core.EP_BasherSpell);
             if (utils::isShield(actor)) {
@@ -102,6 +106,7 @@ class hooks {
         static bool attemptParry(RE::Actor* attacker, RE::Actor* victim) {
             if (!attacker || !victim) return false;
             const auto cfg = settings::Get();
+            if (!parryStyleEnabled(victim, cfg)) return false;
             if (!victim->IsPlayerRef() && !cfg.enableNPCParry) return false;
             const auto attackerState = attacker->AsActorState()->GetAttackState();
             const auto victimState = victim->AsActorState()->GetAttackState();
@@ -147,6 +152,7 @@ class hooks {
             const auto attackerState = hit.attacker->AsActorState()->GetAttackState();
 
             if (attackerState == RE::ATTACK_STATE_ENUM::kBash) {
+                if (!parryStyleEnabled(hit.attacker, cfg)) return result;
                 if (!cfg.enablePowerBashParry) {
                     if (hit.attacker->IsPowerAttacking()) return result;
                 }
@@ -181,7 +187,8 @@ class hooks {
             }
             //remove aggressor bash hitframe
             if (a_aggressor->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
-                if ((!a_aggressor->IsPlayerRef() && !cfg.enableNPCParry) ||
+                if (!parryStyleEnabled(a_aggressor, cfg) ||
+                    (!a_aggressor->IsPlayerRef() && !cfg.enableNPCParry) ||
                     (!cfg.enablePowerBashParry && a_aggressor->IsPowerAttacking())) {
                     return _ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
                 }
@@ -201,6 +208,9 @@ class hooks {
                 return false;
             }
             const auto cfg = settings::Get();
+            if (!parryStyleEnabled(actor, cfg)) {
+                return false;
+            }
             if (!actor->IsPlayerRef() && !cfg.enableNPCParry) {
                 return false;
             }
@@ -268,6 +278,9 @@ class hooks {
         //adapted from https://github.com/doodlum/EldenParry/blob/f6bd72eed354a54058805694f7adaecf24a8e0fa/src/EldenParry.cpp
         static bool canParryProjectile(RE::Actor* a_parrier, RE::TESObjectREFR* a_obj) {
             const auto cfg = settings::Get();
+            if (!parryStyleEnabled(a_parrier, cfg)) {
+                return false;
+            }
             if (cfg.log) {
                 SKSE::log::info("[canParryProjectile] {} attempting to parry projectile", a_parrier->GetName());
             }

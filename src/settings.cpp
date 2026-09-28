@@ -156,6 +156,8 @@ namespace settings {
         ImGuiMCP::Text("Active window: %.2f s to %.2f s (%.2f s)", cfg.delay, cfg.window, cfg.window - cfg.delay);
 
         changed |= ImGuiMCP::SliderFloat("Stagger Magnitude Override", &cfg.staggerMagnitude, 0.0f, 5.0f, "%.2f");
+        changed |= ImGuiMCP::Checkbox("Enable Shield Parry", &cfg.bShieldEnabled);
+        changed |= ImGuiMCP::Checkbox("Enable Non-Shield Parry", &cfg.bNonShieldEnabled);
         changed |= ImGuiMCP::Checkbox("Enable Power Bash Parry", &cfg.enablePowerBashParry);
         changed |= ImGuiMCP::Checkbox("Enable NPC Parry", &cfg.enableNPCParry);
         changed |= ImGuiMCP::Checkbox("Enable diagnostic logging", &cfg.log);

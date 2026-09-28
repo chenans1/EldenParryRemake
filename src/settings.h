@@ -9,6 +9,8 @@ namespace settings {
         float window = 0.24f; 
         float staggerMagnitude = 1.0f;
 
+        bool bShieldEnabled = true;
+        bool bNonShieldEnabled = true;
         bool enablePowerBashParry = false;
         bool enableNPCParry = false;
         bool enableAOEStagger = false;
@@ -29,6 +31,8 @@ namespace settings {
         setting_definition<float>{ "parryDelay", &settings::config::delay },
         setting_definition<float>{ "parryWindow", &settings::config::window },
         setting_definition<float>{ "staggerMagnitude", &settings::config::staggerMagnitude },
+        setting_definition<bool>{ "bShieldEnabled", &settings::config::bShieldEnabled },
+        setting_definition<bool>{ "bNonShieldEnabled", &settings::config::bNonShieldEnabled },
         setting_definition<bool>{ "enablePowerBashParry", &settings::config::enablePowerBashParry },
         setting_definition<bool>{ "enableAOEStagger", &settings::config::enableAOEStagger },
         setting_definition<float>{ "AOEStaggerRadius", &settings::config::AOEStaggerRadius },
