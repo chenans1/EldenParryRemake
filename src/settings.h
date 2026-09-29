@@ -13,8 +13,10 @@ namespace settings {
         bool bNonShieldEnabled = true;
         bool enablePowerBashParry = false;
         bool enableNPCParry = false;
-        bool enableAOEStagger = false;
+        bool enableSingleTargetStagger = false;
+        bool enableAOEStagger = true;
         float AOEStaggerRadius = 128.0f;
+        bool includeDirectAttackerInAOEStagger = true;
         bool bEnableArrowProjectileDeflection = true;
         bool bEnableMagicProjectileDeflection = true;
 
@@ -34,8 +36,10 @@ namespace settings {
         setting_definition<bool>{ "bShieldEnabled", &settings::config::bShieldEnabled },
         setting_definition<bool>{ "bNonShieldEnabled", &settings::config::bNonShieldEnabled },
         setting_definition<bool>{ "enablePowerBashParry", &settings::config::enablePowerBashParry },
+        setting_definition<bool>{ "enableSingleTargetStagger", &settings::config::enableSingleTargetStagger },
         setting_definition<bool>{ "enableAOEStagger", &settings::config::enableAOEStagger },
         setting_definition<float>{ "AOEStaggerRadius", &settings::config::AOEStaggerRadius },
+        setting_definition<bool>{ "includeDirectAttackerInAOEStagger", &settings::config::includeDirectAttackerInAOEStagger },
         setting_definition<bool>{ "enableNPCParry", &settings::config::enableNPCParry },
         setting_definition<bool>{ "bEnableArrowProjectileDeflection", &settings::config::bEnableArrowProjectileDeflection },
         setting_definition<bool>{ "bEnableMagicProjectileDeflection", &settings::config::bEnableMagicProjectileDeflection },

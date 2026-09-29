@@ -131,8 +131,14 @@ class hooks {
             if (cfg.log) SKSE::log::info("[parry] effects defender={:08X} attacker={:08X}", defender->GetFormID(), attacker->GetFormID());
             playParryEffects(defender);
             utils::ApplySpell(defender, attacker, loadedForms.core.EP_AttackerSpell);
-            utils::overrideStaggerMagnitude(loadedForms.core.EP_StaggerSpell, loadedForms.core.EP_StaggerMGEF, cfg.staggerMagnitude);
-            utils::ApplySpell(defender, attacker, loadedForms.core.EP_StaggerSpell);
+            if (cfg.enableAOEStagger) {
+                auto* excluded = cfg.includeDirectAttackerInAOEStagger ? nullptr : attacker;
+                utils::StaggerNearby(defender, cfg.AOEStaggerRadius, loadedForms.core.EP_AOEStaggerSpell, excluded);
+            }
+            if (cfg.enableSingleTargetStagger) {
+                utils::overrideStaggerMagnitude(loadedForms.core.EP_StaggerSpell, loadedForms.core.EP_StaggerMGEF, cfg.staggerMagnitude);
+                utils::ApplySpell(defender, attacker, loadedForms.core.EP_StaggerSpell);
+            }
         }
 
         static void queueParryEffects(RE::Actor* defender, RE::Actor* attacker) {
@@ -278,23 +284,18 @@ class hooks {
         static bool PC_NotifyAnimationGraph(RE::IAnimationGraphManagerHolder* a_this, const RE::BSFixedString& a_eventName) {
             const bool result = _original_PC_Notify(a_this, a_eventName);
             static const RE::BSFixedString bashStart{ "bashStart" };
-            static const RE::BSFixedString bashRelease{ "bashRelease" };
             static auto* const player = RE::PlayerCharacter::GetSingleton();
 
             if (a_eventName == bashStart) {
                 if (settings::Get().log) SKSE::log::info("[PC_NotifyAnimationGraph] bashStart actor={:08X}", player->GetFormID());
                 applyParryWindow(player);
             } 
-            // else if (a_eventName == bashRelease && settings::Get().log) {
-            //     SKSE::log::info("[PC_NotifyAnimationGraph] bashRelease actor={:08X}", player->GetFormID());
-            // }
             return result;
         }
 
         static bool NPC_NotifyAnimationGraph(RE::IAnimationGraphManagerHolder* a_this, const RE::BSFixedString& a_eventName) {
             const bool result = _original_NPC_notify(a_this, a_eventName);
             static const RE::BSFixedString bashStart{ "bashStart" };
-            // static const RE::BSFixedString bashRelease{ "bashRelease" };
             // auto* refr = static_cast<RE::TESObjectREFR*>(a_this);
             auto* refr = SKSE::stl::adjust_pointer<RE::TESObjectREFR>(a_this, -0x38);
             auto* actor = refr ? refr->As<RE::Actor>() : nullptr;
@@ -305,9 +306,6 @@ class hooks {
                 if (settings::Get().log) SKSE::log::info("[NPC_NotifyAnimationGraph] bashStart actor={:08X}", actor->GetFormID());
                 applyParryWindow(actor);
             } 
-            // else if (a_eventName == bashRelease && settings::Get().log) {
-            //     SKSE::log::info("[NPC_NotifyAnimationGraph] bashRelease actor={:08X}", actor->GetFormID());
-            // }
             return result;
         }
 

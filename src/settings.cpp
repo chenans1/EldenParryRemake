@@ -155,6 +155,12 @@ namespace settings {
         changed |= ImGuiMCP::SliderFloat("Parry Window End", &cfg.window, cfg.delay, cfg.delay + 1.0f, "%.2f");
         ImGuiMCP::Text("Active window: %.2f s to %.2f s (%.2f s)", cfg.delay, cfg.window, cfg.window - cfg.delay);
 
+        changed |= ImGuiMCP::Checkbox("Enable Single Target Stagger", &cfg.enableSingleTargetStagger);
+        changed |= ImGuiMCP::Checkbox("Enable AOE Stagger", &cfg.enableAOEStagger);
+        if (cfg.enableAOEStagger) {
+            changed |= ImGuiMCP::SliderFloat("AOE Stagger Radius", &cfg.AOEStaggerRadius, 0.0f, 4095.0f, "%.0f");
+            changed |= ImGuiMCP::Checkbox("Include Direct Attacker in AOE Stagger", &cfg.includeDirectAttackerInAOEStagger);
+        }
         changed |= ImGuiMCP::SliderFloat("Stagger Magnitude Override", &cfg.staggerMagnitude, 0.0f, 5.0f, "%.2f");
         changed |= ImGuiMCP::Checkbox("Enable Shield Parry", &cfg.bShieldEnabled);
         changed |= ImGuiMCP::Checkbox("Enable Non-Shield Parry", &cfg.bNonShieldEnabled);

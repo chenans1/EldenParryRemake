@@ -50,22 +50,23 @@ namespace utils {
         return handle;
     }
 
-    // inline static void StaggerNearby(RE::Actor* a_defender, float radius) {
-    //     auto* cell = a_defender ? a_defender->GetParentCell() : nullptr;
-    //     if (!cell || !cell->IsAttached() || radius <= 0.0f) {
-    //         return;
-    //     }
-    //     radius = std::min(radius, 4095.0f);
-    //     cell->ForEachReferenceInRange(a_defender->GetPosition(), radius, [&](RE::TESObjectREFR* ref){
-    //         auto* actor = ref ? ref->As<RE::Actor>() : nullptr;
-    //         if (!actor || actor->IsDisabled() || !actor->Is3DLoaded() || actor == a_defender) {
-    //             return RE::BSContainer::ForEachResult::kContinue;
-    //         }
-    //         SKSE::log::info("[Utils] Staggering={:08X} ", actor ? actor->GetFormID() : 0);
-    //         ApplySpell(a_defender, actor, hooks::timedBlockStaggerSpell);
-    //         return RE::BSContainer::ForEachResult::kContinue;
-    //     });
-    // }   
+    inline static void StaggerNearby(RE::Actor* a_defender, float radius, RE::SpellItem* a_spell, RE::Actor* excluded) {
+        auto* cell = a_defender ? a_defender->GetParentCell() : nullptr;
+        if (!cell || !cell->IsAttached() || !a_spell || radius <= 0.0f) {
+            return;
+        }
+        const bool log = settings::Get().log;
+        radius = std::min(radius, 4095.0f);
+        cell->ForEachReferenceInRange(a_defender->GetPosition(), radius, [&](RE::TESObjectREFR* ref){
+            auto* actor = ref ? ref->As<RE::Actor>() : nullptr;
+            if (!actor || actor->IsDisabled() || !actor->Is3DLoaded() || actor == a_defender || actor == excluded) {
+                return RE::BSContainer::ForEachResult::kContinue;
+            }
+            if (log) SKSE::log::info("[StaggerNearby] target={:08X}", actor->GetFormID());
+            ApplySpell(a_defender, actor, a_spell);
+            return RE::BSContainer::ForEachResult::kContinue;
+        });
+    }
 
     inline static bool hasMGEF(RE::Actor* actor, RE::EffectSetting* a_effect) {
         if (!actor || !a_effect) {
