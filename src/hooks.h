@@ -139,6 +139,7 @@ class hooks {
                 utils::overrideStaggerMagnitude(loadedForms.core.EP_StaggerSpell, loadedForms.core.EP_StaggerMGEF, cfg.staggerMagnitude);
                 utils::ApplySpell(defender, attacker, loadedForms.core.EP_StaggerSpell);
             }
+            utils::sendMeleeEvent(attacker);
         }
 
         static void queueParryEffects(RE::Actor* defender, RE::Actor* attacker) {
@@ -330,62 +331,106 @@ class hooks {
             return isParrying && inBlockAngle;
         }
 
-        static bool processProjectileParry(RE::Actor* a_parrier, RE::Projectile* a_projectile, RE::hkpCollidable* a_projectile_collidable) {
+        static void queueProjectileStagger(RE::Actor* a_parrier, RE::Actor* a_shooter, float a_magnitude) {
+            const auto parrierHandle = a_parrier->GetHandle();
+            const auto shooterHandle = a_shooter->GetHandle();
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                tasks->AddTask([parrierHandle, shooterHandle, a_magnitude]() {
+                    auto parrier = parrierHandle.get();
+                    auto shooter = shooterHandle.get();
+                    if (!parrier || !shooter) {
+                        return;
+                    }
+                    utils::overrideStaggerMagnitude(loadedForms.core.EP_StaggerSpell, loadedForms.core.EP_StaggerMGEF, a_magnitude);
+                    if (utils::ApplySpell(parrier.get(), shooter.get(), loadedForms.core.EP_StaggerSpell) && settings::Get().log) {
+                        SKSE::log::info("[projectile parry] staggered shooter={:08X} parrier={:08X}", shooter->GetFormID(), parrier->GetFormID());
+                    }
+                });
+            } else {
+                SKSE::log::error("[projectile parry] task interface unavailable; shooter stagger was not applied");
+            }
+        }
+
+        static void queueRangedParryEvent() {
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                tasks->AddTask([]() { utils::sendRangedEvent(); });
+            } else {
+                SKSE::log::error("[projectile parry] task interface unavailable; ranged event was not sent");
+            }
+        }
+
+        static bool processProjectileParry(RE::Actor* a_parrier, RE::Projectile* a_projectile, RE::hkpCollidable* a_projectile_collidable,
+            bool a_reflect, bool a_stagger, float a_staggerMagnitude) {
             if (canParryProjectile(a_parrier, a_projectile)) {
-                RE::TESObjectREFR* shooter = nullptr;
-                if (a_projectile->GetProjectileRuntimeData().shooter && a_projectile->GetProjectileRuntimeData().shooter.get()) {
-                    shooter = a_projectile->GetProjectileRuntimeData().shooter.get().get();
+                auto shooter = a_projectile->GetProjectileRuntimeData().shooter.get();
+                auto* shooterActor = shooter ? shooter->As<RE::Actor>() : nullptr;
+                if (a_stagger && shooterActor && shooterActor != a_parrier) {
+                    queueProjectileStagger(a_parrier, shooterActor, a_staggerMagnitude);
                 }
 
-                utils::resetProjectileOwner(a_projectile, a_parrier, a_projectile_collidable);
-
-                if (shooter && shooter->Is3DLoaded()) {
-                    utils::RetargetProjectile(a_projectile, shooter);
-                } else {
-                    utils::ReflectProjectile(a_projectile);
+                if (a_reflect) {
+                    utils::resetProjectileOwner(a_projectile, a_parrier, a_projectile_collidable);
+                    if (shooter && shooter->Is3DLoaded()) {
+                        utils::RetargetProjectile(a_projectile, shooter.get());
+                    } else {
+                        utils::ReflectProjectile(a_projectile);
+                    }
                 }
-                
+
                 playParryEffects(a_parrier);
-                // if (a_parrier->IsPlayerRef()) {
-                //     RE::PlayerCharacter::GetSingleton()->AddSkillExperience(RE::ActorValue::kBlock, Settings::fProjectileParryExp);
-                // }
-                // if (Settings::bSuccessfulParryNoCost) {
-                //     negateParryCost(a_parrier);
-                // }
-                // send_ranged_parry_event();
+                queueRangedParryEvent();
+                if (!a_reflect) {
+                    a_projectile->Kill();
+                }
+                if (settings::Get().log) {
+                    SKSE::log::info("[projectile parry] parrier={:08X} shooter={:08X} reflected={} staggerEnabled={} damageCancelled=true",
+                        a_parrier->GetFormID(), shooterActor ? shooterActor->GetFormID() : 0, a_reflect, a_stagger);
+                }
                 return true;
             }
             return false;
-
         }
 
         //taken from: https://github.com/doodlum/EldenParry/blob/main/src/Hooks.h
         static bool shouldIgnoreHit(RE::Projectile* a_projectile, RE::hkpAllCdPointCollector* a_AllCdPointCollector) {
-			if (a_AllCdPointCollector) {
-                const auto cfg = settings::Get();
-				const bool deflectionEnabled = a_projectile->GetProjectileRuntimeData().spell
-				    ? cfg.bEnableMagicProjectileDeflection
-				    : (a_projectile->GetFormType() == RE::FormType::ProjectileArrow && cfg.bEnableArrowProjectileDeflection);
-				for (auto& hit : a_AllCdPointCollector->hits) {
-					auto refrA = RE::TESHavokUtilities::FindCollidableRef(*hit.rootCollidableA);
-					auto refrB = RE::TESHavokUtilities::FindCollidableRef(*hit.rootCollidableB);
-					if (refrA && refrA->formType == RE::FormType::ActorCharacter && refrA->As<RE::Actor>()->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
-						if (refrA->IsPlayerRef() || cfg.enableNPCParry) {
-							if (deflectionEnabled) {
-								return processProjectileParry(refrA->As<RE::Actor>(), a_projectile, const_cast<RE::hkpCollidable*>(hit.rootCollidableB));
-							}
-						}
-					}
-					if (refrB && refrB->formType == RE::FormType::ActorCharacter && refrB->As<RE::Actor>()->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
-						if (refrB->IsPlayerRef() || cfg.enableNPCParry) {
-							if (deflectionEnabled) {
-								return processProjectileParry(refrB->As<RE::Actor>(), a_projectile, const_cast<RE::hkpCollidable*>(hit.rootCollidableA));
-							}
-						}
-					}
-				}
-			}
-			return false;
+            if (!a_projectile || !a_AllCdPointCollector) {
+                return false;
+            }
+
+            const auto cfg = settings::Get();
+            const bool spellProjectile = a_projectile->GetProjectileRuntimeData().spell != nullptr;
+            const bool arrowProjectile = !spellProjectile && a_projectile->GetFormType() == RE::FormType::ProjectileArrow;
+            if (!spellProjectile && !arrowProjectile) {
+                return false;
+            }
+
+            const bool reflect = spellProjectile ? cfg.bEnableMagicProjectileDeflection : cfg.bEnableArrowProjectileDeflection;
+            const bool stagger = spellProjectile ? cfg.enableSpellCasterStagger : cfg.enableRangedStagger;
+            if (!reflect && !stagger) {
+                return false;
+            }
+
+            for (auto& hit : a_AllCdPointCollector->hits) {
+                if (!hit.rootCollidableA || !hit.rootCollidableB) {
+                    continue;
+                }
+                auto* refrA = RE::TESHavokUtilities::FindCollidableRef(*hit.rootCollidableA);
+                auto* refrB = RE::TESHavokUtilities::FindCollidableRef(*hit.rootCollidableB);
+                auto tryParry = [&](RE::TESObjectREFR* a_ref, RE::hkpCollidable* a_projectileCollidable) {
+                    auto* actor = a_ref ? a_ref->As<RE::Actor>() : nullptr;
+                    if (!actor || actor->AsActorState()->GetAttackState() != RE::ATTACK_STATE_ENUM::kBash ||
+                        (!actor->IsPlayerRef() && !cfg.enableNPCParry)) {
+                        return false;
+                    }
+                    return processProjectileParry(actor, a_projectile, a_projectileCollidable, reflect, stagger,
+                        cfg.staggerMagnitude);
+                };
+                if (tryParry(refrA, const_cast<RE::hkpCollidable*>(hit.rootCollidableB)) ||
+                    tryParry(refrB, const_cast<RE::hkpCollidable*>(hit.rootCollidableA))) {
+                    return true;
+                }
+            }
+            return false;
 		}
 
         static void OnArrowCollision(RE::Projectile* a_this, RE::hkpAllCdPointCollector* a_AllCdPointCollector) {

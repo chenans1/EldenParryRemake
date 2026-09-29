@@ -19,6 +19,8 @@ namespace settings {
         bool includeDirectAttackerInAOEStagger = true;
         bool bEnableArrowProjectileDeflection = true;
         bool bEnableMagicProjectileDeflection = true;
+        bool enableRangedStagger = false;
+        bool enableSpellCasterStagger = false;
 
     };
     
@@ -43,6 +45,8 @@ namespace settings {
         setting_definition<bool>{ "enableNPCParry", &settings::config::enableNPCParry },
         setting_definition<bool>{ "bEnableArrowProjectileDeflection", &settings::config::bEnableArrowProjectileDeflection },
         setting_definition<bool>{ "bEnableMagicProjectileDeflection", &settings::config::bEnableMagicProjectileDeflection },
+        setting_definition<bool>{ "enableRangedStagger", &settings::config::enableRangedStagger },
+        setting_definition<bool>{ "enableSpellCasterStagger", &settings::config::enableSpellCasterStagger },
     };
 
     config Get();

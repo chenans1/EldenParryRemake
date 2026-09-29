@@ -19,6 +19,16 @@ namespace utils {
         return false;
     }
 
+    inline static void sendMeleeEvent(RE::Actor* a_attacker) {
+        SKSE::ModCallbackEvent modEvent{RE::BSFixedString("EP_MeleeParryEvent"), RE::BSFixedString(), 0.0f, a_attacker};
+	    SKSE::GetModCallbackEventSource()->SendEvent(&modEvent);
+    }
+
+    inline static void sendRangedEvent() {
+            SKSE::ModCallbackEvent modEvent{RE::BSFixedString("EP_RangedParryEvent"), RE::BSFixedString(), 0.0f, nullptr };
+            SKSE::GetModCallbackEventSource()->SendEvent(&modEvent);
+    }
+
     // inline static void SendTBModEvent(RE::Actor* a_defender, RE::Actor* a_attacker) {
     //     const auto attacker_ID = a_attacker ? a_attacker->GetFormID() : 0x0;
     //     const auto level = a_attacker ? a_attacker->GetLevel() : 0x0;
