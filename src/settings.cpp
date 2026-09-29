@@ -143,7 +143,7 @@ namespace settings {
     void __stdcall RenderMenuPage() {
         config cfg = Get();
         bool changed = false;
-        // changed |= ImGuiMCP::Checkbox("Enable Sound Effects", &cfg.applyTimedBlockSFX);
+        changed |= ImGuiMCP::Checkbox("Enable Parry Sound Effects", &cfg.enableSoundEffects);
         ImGuiMCP::TextUnformatted("Times are measured from bash start.");
         changed |= ImGuiMCP::SliderFloat("Parry Window Delay", &cfg.delay, 0.0f, 1.0f, "%.2f");
 
@@ -158,7 +158,7 @@ namespace settings {
         changed |= ImGuiMCP::Checkbox("Enable Non-Shield Parry", &cfg.bNonShieldEnabled);
         changed |= ImGuiMCP::Checkbox("Enable Power Bash Parry", &cfg.enablePowerBashParry);
         changed |= ImGuiMCP::Checkbox("Enable NPC Parry", &cfg.enableNPCParry);
-        changed |= ImGuiMCP::Checkbox("Enable Single Target Stagger", &cfg.enableSingleTargetStagger);
+        changed |= ImGuiMCP::Checkbox("Enable Melee Single Target Stagger", &cfg.enableSingleTargetStagger);
         changed |= ImGuiMCP::Checkbox("Enable AOE Stagger", &cfg.enableAOEStagger);
 
         if (cfg.enableAOEStagger) {

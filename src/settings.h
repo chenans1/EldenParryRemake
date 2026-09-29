@@ -13,6 +13,7 @@ namespace settings {
         bool bNonShieldEnabled = true;
         bool enablePowerBashParry = false;
         bool enableNPCParry = false;
+        bool enableSoundEffects = true;
         bool enableSingleTargetStagger = false;
         bool enableAOEStagger = true;
         float AOEStaggerRadius = 128.0f;
@@ -39,6 +40,7 @@ namespace settings {
         setting_definition<bool>{ "bNonShieldEnabled", &settings::config::bNonShieldEnabled },
         setting_definition<bool>{ "enablePowerBashParry", &settings::config::enablePowerBashParry },
         setting_definition<bool>{ "enableSingleTargetStagger", &settings::config::enableSingleTargetStagger },
+        setting_definition<bool>{ "enableSoundEffects", &settings::config::enableSoundEffects },
         setting_definition<bool>{ "enableAOEStagger", &settings::config::enableAOEStagger },
         setting_definition<float>{ "AOEStaggerRadius", &settings::config::AOEStaggerRadius },
         setting_definition<bool>{ "includeDirectAttackerInAOEStagger", &settings::config::includeDirectAttackerInAOEStagger },

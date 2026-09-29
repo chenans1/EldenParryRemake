@@ -89,11 +89,20 @@ class hooks {
             return utils::isShield(actor) ? cfg.bShieldEnabled : cfg.bNonShieldEnabled;
         }
 
-        static void playParryEffects(RE::Actor* actor) {
+        static bool claimParrySound(RE::Actor* actor) {
+            if (!settings::Get().enableSoundEffects) {
+                return false;
+            }
+            std::lock_guard lock(_parryHitsMutex);
+            return _soundPlayedThisBash.insert(actor->GetFormID()).second;
+        }
+
+        static void playParryEffects(RE::Actor* actor, bool playSound) {
             utils::ApplySpell(actor, actor, loadedForms.core.EP_BasherSpell);
-            if (utils::isShield(actor)) {
-                utils::play_sound(actor, loadedForms.core.EP_SFXWeapon);
-            } else {
+            if (settings::Get().log) {
+                SKSE::log::info("[parry sound] actor={:08X} requested={}", actor->GetFormID(), playSound);
+            }
+            if (playSound) {
                 utils::play_sound(actor, loadedForms.core.EP_SFXWeapon);
             }
         }
@@ -126,10 +135,10 @@ class hooks {
             return false;
         }
 
-        static void applyParryEffects(RE::Actor* defender, RE::Actor* attacker) {
+        static void applyParryEffects(RE::Actor* defender, RE::Actor* attacker, bool playSound) {
             const auto cfg = settings::Get();
             if (cfg.log) SKSE::log::info("[parry] effects defender={:08X} attacker={:08X}", defender->GetFormID(), attacker->GetFormID());
-            playParryEffects(defender);
+            playParryEffects(defender, playSound);
             utils::ApplySpell(defender, attacker, loadedForms.core.EP_AttackerSpell);
             if (cfg.enableAOEStagger) {
                 auto* excluded = cfg.includeDirectAttackerInAOEStagger ? nullptr : attacker;
@@ -142,15 +151,15 @@ class hooks {
             utils::sendMeleeEvent(attacker);
         }
 
-        static void queueParryEffects(RE::Actor* defender, RE::Actor* attacker) {
+        static void queueParryEffects(RE::Actor* defender, RE::Actor* attacker, bool playSound) {
             const auto defenderHandle = defender->GetHandle();
             const auto attackerHandle = attacker->GetHandle();
             if (auto* tasks = SKSE::GetTaskInterface()) {
-                tasks->AddTask([defenderHandle, attackerHandle]() {
+                tasks->AddTask([defenderHandle, attackerHandle, playSound]() {
                     auto resolvedDefender = defenderHandle.get();
                     auto resolvedAttacker = attackerHandle.get();
                     if (resolvedDefender && resolvedAttacker) {
-                        applyParryEffects(resolvedDefender.get(), resolvedAttacker.get());
+                        applyParryEffects(resolvedDefender.get(), resolvedAttacker.get(), playSound);
                     }
                 });
             } else {
@@ -182,7 +191,7 @@ class hooks {
             }
 
             if (firstCollision) {
-                queueParryEffects(defender, attacker);
+                queueParryEffects(defender, attacker, claimParrySound(defender));
             }
             return true;
         }
@@ -266,6 +275,7 @@ class hooks {
             {
                 std::lock_guard lock(_parryHitsMutex);
                 _parriedAttackers.erase(actor->GetFormID());
+                _soundPlayedThisBash.erase(actor->GetFormID());
             }
             const auto cfg = settings::Get();
             if (!parryStyleEnabled(actor, cfg)) {
@@ -377,7 +387,7 @@ class hooks {
                     }
                 }
 
-                playParryEffects(a_parrier);
+                playParryEffects(a_parrier, claimParrySound(a_parrier));
                 queueRangedParryEvent();
                 if (!a_reflect) {
                     a_projectile->Kill();
@@ -450,6 +460,7 @@ class hooks {
 		static inline REL::Relocation<decltype(processHit)> _ProcessHit;
         static inline std::mutex _parryHitsMutex;
         static inline std::unordered_map<RE::FormID, std::unordered_set<RE::FormID>> _parriedAttackers;
+        static inline std::unordered_set<RE::FormID> _soundPlayedThisBash;
         static inline REL::Relocation<decltype(OnArrowCollision)> _arrowCollission;
 		static inline REL::Relocation<decltype(OnMissileCollision)> _missileCollission;
         static inline REL::Relocation<decltype(PC_NotifyAnimationGraph)> _original_PC_Notify;
