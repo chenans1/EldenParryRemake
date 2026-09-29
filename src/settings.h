@@ -8,6 +8,8 @@ namespace settings {
         float delay = 0.08f; 
         float window = 0.24f; 
         float staggerMagnitude = 1.0f;
+        float meleeBlockExperience = 10.0f;
+        float projectileBlockExperience = 20.0f;
 
         bool bShieldEnabled = true;
         bool bNonShieldEnabled = true;
@@ -36,6 +38,8 @@ namespace settings {
         setting_definition<float>{ "parryDelay", &settings::config::delay },
         setting_definition<float>{ "parryWindow", &settings::config::window },
         setting_definition<float>{ "staggerMagnitude", &settings::config::staggerMagnitude },
+        setting_definition<float>{ "meleeBlockExperience", &settings::config::meleeBlockExperience },
+        setting_definition<float>{ "projectileBlockExperience", &settings::config::projectileBlockExperience },
         setting_definition<bool>{ "bShieldEnabled", &settings::config::bShieldEnabled },
         setting_definition<bool>{ "bNonShieldEnabled", &settings::config::bNonShieldEnabled },
         setting_definition<bool>{ "enablePowerBashParry", &settings::config::enablePowerBashParry },

@@ -107,6 +107,40 @@ class hooks {
             }
         }
 
+        static void addBlockExperience(RE::Actor* defender, float experience) {
+            auto* player = RE::PlayerCharacter::GetSingleton();
+            if (experience <= 0.0f || !player || defender != player) {
+                return;
+            }
+            player->AddSkillExperience(RE::ActorValue::kBlock, experience);
+            if (settings::Get().log) {
+                SKSE::log::info("[parry XP] added {} Block experience", experience);
+            }
+        }
+
+        static void queueBlockExperience(RE::Actor* defender, float experience) {
+            if (experience <= 0.0f || !defender->IsPlayerRef()) {
+                return;
+            }
+            const auto defenderHandle = defender->GetHandle();
+            if (auto* tasks = SKSE::GetTaskInterface()) {
+                tasks->AddTask([defenderHandle, experience]() {
+                    auto resolvedDefender = defenderHandle.get();
+                    if (resolvedDefender) {
+                        addBlockExperience(resolvedDefender.get(), experience);
+                    }
+                });
+            } else {
+                SKSE::log::error("[parry XP] task interface unavailable; Block experience was not added");
+            }
+        }
+
+        // Collision callbacks can repeat for one projectile during the same bash.
+        static bool claimProjectileExperience(RE::Actor* defender, RE::Projectile* projectile) {
+            std::lock_guard lock(_parryHitsMutex);
+            return _creditedProjectiles[defender->GetFormID()].insert(projectile->GetFormID()).second;
+        }
+
         // Check the current collision without applying any effects.
         static bool canParry(RE::Actor* attacker, RE::Actor* defender) {
             if (!attacker || !defender) return false;
@@ -148,6 +182,7 @@ class hooks {
                 utils::overrideStaggerMagnitude(loadedForms.core.EP_StaggerSpell, loadedForms.core.EP_StaggerMGEF, cfg.staggerMagnitude);
                 utils::ApplySpell(defender, attacker, loadedForms.core.EP_StaggerSpell);
             }
+            addBlockExperience(defender, cfg.meleeBlockExperience);
             utils::sendMeleeEvent(attacker);
         }
 
@@ -276,6 +311,7 @@ class hooks {
                 std::lock_guard lock(_parryHitsMutex);
                 _parriedAttackers.erase(actor->GetFormID());
                 _soundPlayedThisBash.erase(actor->GetFormID());
+                _creditedProjectiles.erase(actor->GetFormID());
             }
             const auto cfg = settings::Get();
             if (!parryStyleEnabled(actor, cfg)) {
@@ -372,6 +408,11 @@ class hooks {
         static bool processProjectileParry(RE::Actor* a_parrier, RE::Projectile* a_projectile, RE::hkpCollidable* a_projectile_collidable,
             bool a_reflect, bool a_stagger, float a_staggerMagnitude) {
             if (canParryProjectile(a_parrier, a_projectile)) {
+                const auto cfg = settings::Get();
+                if (cfg.projectileBlockExperience > 0.0f && a_parrier->IsPlayerRef() &&
+                    claimProjectileExperience(a_parrier, a_projectile)) {
+                    queueBlockExperience(a_parrier, cfg.projectileBlockExperience);
+                }
                 auto shooter = a_projectile->GetProjectileRuntimeData().shooter.get();
                 auto* shooterActor = shooter ? shooter->As<RE::Actor>() : nullptr;
                 if (a_stagger && shooterActor && shooterActor != a_parrier) {
@@ -416,7 +457,7 @@ class hooks {
 
             const bool reflect = spellProjectile ? cfg.bEnableMagicProjectileDeflection : cfg.bEnableArrowProjectileDeflection;
             const bool stagger = spellProjectile ? cfg.enableSpellCasterStagger : cfg.enableRangedStagger;
-            if (!reflect && !stagger) {
+            if (!reflect && !stagger && cfg.projectileBlockExperience <= 0.0f) {
                 return false;
             }
 
@@ -461,6 +502,7 @@ class hooks {
         static inline std::mutex _parryHitsMutex;
         static inline std::unordered_map<RE::FormID, std::unordered_set<RE::FormID>> _parriedAttackers;
         static inline std::unordered_set<RE::FormID> _soundPlayedThisBash;
+        static inline std::unordered_map<RE::FormID, std::unordered_set<RE::FormID>> _creditedProjectiles;
         static inline REL::Relocation<decltype(OnArrowCollision)> _arrowCollission;
 		static inline REL::Relocation<decltype(OnMissileCollision)> _missileCollission;
         static inline REL::Relocation<decltype(PC_NotifyAnimationGraph)> _original_PC_Notify;

@@ -170,6 +170,8 @@ namespace settings {
         changed |= ImGuiMCP::Checkbox("Reflect Arrows", &cfg.bEnableArrowProjectileDeflection);
         changed |= ImGuiMCP::Checkbox("Stagger Ranged Attackers", &cfg.enableRangedStagger);
         changed |= ImGuiMCP::Checkbox("Stagger Spell Casters", &cfg.enableSpellCasterStagger);
+        changed |= ImGuiMCP::SliderFloat("Melee Parry Block XP", &cfg.meleeBlockExperience, 0.0f, 100.0f, "%.1f");
+        changed |= ImGuiMCP::SliderFloat("Projectile Parry Block XP", &cfg.projectileBlockExperience, 0.0f, 100.0f, "%.1f");
         changed |= ImGuiMCP::Checkbox("Enable diagnostic logging", &cfg.log);
         FinishMenuPage(cfg, changed);
     }
