@@ -141,6 +141,59 @@ class hooks {
             return _creditedProjectiles[defender->GetFormID()].insert(projectile->GetFormID()).second;
         }
 
+        // new function to handle spell casters: check if they're in the charging/ready state but not release?
+        static bool isCharging(RE::Actor* attacker) {
+            if (!attacker) return false;
+
+            auto* rightCaster = attacker->GetMagicCaster(RE::MagicSystem::CastingSource::kRightHand);
+            auto* leftCaster = attacker->GetMagicCaster(RE::MagicSystem::CastingSource::kLeftHand);
+
+            if (!rightCaster && !leftCaster) {
+                return false;
+            }
+
+            const auto isActiveCastState = [](const RE::MagicCaster* caster) {
+                if (!caster) {
+                    return false;
+                }
+
+                return caster->state == RE::MagicCaster::State::kReady ||
+                    caster->state == RE::MagicCaster::State::kCharging ||
+                    caster->state == RE::MagicCaster::State::kCasting;
+            };
+
+            const bool rightActive = isActiveCastState(rightCaster);
+            const bool leftActive = isActiveCastState(leftCaster);
+            if (settings::Get().log) {
+                SKSE::log::info("[isCharging] attacker={:08X} rightState={} leftState={} active={}",
+                    attacker->GetFormID(),
+                    rightCaster ? rightCaster->state.underlying() : 0,
+                    leftCaster ? leftCaster->state.underlying() : 0,
+                    rightActive || leftActive);
+            }
+
+            return rightActive || leftActive;
+        }
+
+        //when strict mode setting: Checked the ranged attacker to be in attack state.
+        static bool checkRangedAttacker(RE::Actor* attacker) {
+            if (!attacker) return;
+            const auto attackerState = attacker->AsActorState()->GetAttackState();
+            return attackerState == RE::ATTACK_STATE_ENUM::kBowDrawn 
+                || attackerState == RE::ATTACK_STATE_ENUM::kBowReleasing
+                || isCharging(attacker);
+        }
+
+        //checks if the attacker is ranged. 
+        static bool isRanged(RE::Actor* actor) {
+            if (!actor) {
+                return false;
+            }
+            int rightHand = 0;
+            actor->GetGraphVariableInt("iRightHandType", rightHand);
+            return (rightHand == 7 || rightHand == 8 || rightHand == 9 || rightHand == 12);
+        }
+
         // Check the current collision without applying any effects.
         static bool canParry(RE::Actor* attacker, RE::Actor* defender) {
             if (!attacker || !defender) return false;
@@ -151,6 +204,10 @@ class hooks {
             const auto defenderState = defender->AsActorState()->GetAttackState();
             // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing || attackerState == RE::ATTACK_STATE_ENUM::kHit;
             const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing;
+            // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing 
+            //     || attackerState == RE::ATTACK_STATE_ENUM::kBowDrawn 
+            //     || attackerState == RE::ATTACK_STATE_ENUM::kBowReleasing
+            //     || isCharging(attacker);
             const bool defenderBashing = defenderState == RE::ATTACK_STATE_ENUM::kBash;
             if (!cfg.enablePowerBashParry && defender->IsPowerAttacking()) return false;
             if (cfg.log) {
@@ -251,6 +308,7 @@ class hooks {
                 if (!hit.attacker->IsPlayerRef() && !cfg.enableNPCParry){
                     return result;
                 }
+
                 if (resolveParry(victim, hit.attacker)) {
                     if (cfg.log) SKSE::log::info("[Precision pre-hit] allowing parry bash hit attacker={:08X} target={:08X}", hit.attacker->GetFormID(), victim->GetFormID());
                 } else {

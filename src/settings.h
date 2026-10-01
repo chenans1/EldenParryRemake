@@ -11,6 +11,11 @@ namespace settings {
         float meleeBlockExperience = 10.0f;
         float projectileBlockExperience = 20.0f;
 
+        //doesn't delete the precision bash hitframe on ranged attackers.
+        bool bashingAffectsRanged = true;
+        //this is to "parry" ranged attackers in melee, separate from parrying projectiles. 
+        bool harderMeleeRangedBashing = false;
+
         bool bShieldEnabled = true;
         bool bNonShieldEnabled = true;
         bool enablePowerBashParry = false;
@@ -53,6 +58,10 @@ namespace settings {
         setting_definition<bool>{ "bEnableMagicProjectileDeflection", &settings::config::bEnableMagicProjectileDeflection },
         setting_definition<bool>{ "enableRangedStagger", &settings::config::enableRangedStagger },
         setting_definition<bool>{ "enableSpellCasterStagger", &settings::config::enableSpellCasterStagger },
+
+        setting_definition<bool>{ "bashingAffectsRanged", &settings::config::bashingAffectsRanged },
+        setting_definition<bool>{ "harderMeleeRangedBashing", &settings::config::harderMeleeRangedBashing },
+
     };
 
     config Get();
