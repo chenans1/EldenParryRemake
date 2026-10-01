@@ -554,7 +554,11 @@ class hooks {
                 return false;
             }
 
-            const bool reflect = spellProjectile ? cfg.bEnableMagicProjectileDeflection : cfg.bEnableArrowProjectileDeflection;
+            if (spellProjectile ? cfg.bDisableSpellParry : cfg.bDisableArrowParry) {
+                return false;
+            }
+
+            const bool reflect = spellProjectile ? cfg.bEnableMagicProjectileReflection : cfg.bEnableArrowProjectileReflection;
             const bool stagger = spellProjectile ? cfg.enableSpellCasterStagger : cfg.enableRangedStagger;
             if (!reflect && !stagger && cfg.projectileBlockExperience <= 0.0f) {
                 return false;

@@ -166,8 +166,10 @@ namespace settings {
             changed |= ImGuiMCP::Checkbox("Include Direct Attacker in AOE Stagger", &cfg.includeDirectAttackerInAOEStagger);
         }
         changed |= ImGuiMCP::SliderFloat("Stagger Magnitude Override", &cfg.staggerMagnitude, 0.0f, 5.0f, "%.2f");
-        changed |= ImGuiMCP::Checkbox("Reflect Spells", &cfg.bEnableMagicProjectileDeflection);
-        changed |= ImGuiMCP::Checkbox("Reflect Arrows", &cfg.bEnableArrowProjectileDeflection);
+        changed |= ImGuiMCP::Checkbox("Disable Spell Parrying", &cfg.bDisableSpellParry);
+        changed |= ImGuiMCP::Checkbox("Disable Arrow Parrying", &cfg.bDisableArrowParry);
+        changed |= ImGuiMCP::Checkbox("Reflect Spells", &cfg.bEnableMagicProjectileReflection);
+        changed |= ImGuiMCP::Checkbox("Reflect Arrows", &cfg.bEnableArrowProjectileReflection);
         changed |= ImGuiMCP::Checkbox("Stagger Ranged Attackers", &cfg.enableRangedStagger);
         changed |= ImGuiMCP::Checkbox("Stagger Spell Casters", &cfg.enableSpellCasterStagger);
         changed |= ImGuiMCP::Checkbox("Melee Bash Hitframes Affect Ranged Targets", &cfg.bashingAffectsRanged);

@@ -25,8 +25,11 @@ namespace settings {
         bool enableAOEStagger = true;
         float AOEStaggerRadius = 128.0f;
         bool includeDirectAttackerInAOEStagger = true;
-        bool bEnableArrowProjectileDeflection = true;
-        bool bEnableMagicProjectileDeflection = true;
+
+        bool bDisableArrowParry = false;
+        bool bDisableSpellParry = false;
+        bool bEnableArrowProjectileReflection = true;
+        bool bEnableMagicProjectileReflection = true;
         bool enableRangedStagger = true;
         bool enableSpellCasterStagger = true;
 
@@ -54,8 +57,10 @@ namespace settings {
         setting_definition<float>{ "AOEStaggerRadius", &settings::config::AOEStaggerRadius },
         setting_definition<bool>{ "includeDirectAttackerInAOEStagger", &settings::config::includeDirectAttackerInAOEStagger },
         setting_definition<bool>{ "enableNPCParry", &settings::config::enableNPCParry },
-        setting_definition<bool>{ "bEnableArrowProjectileDeflection", &settings::config::bEnableArrowProjectileDeflection },
-        setting_definition<bool>{ "bEnableMagicProjectileDeflection", &settings::config::bEnableMagicProjectileDeflection },
+        setting_definition<bool>{ "bDisableArrowParry", &settings::config::bDisableArrowParry },
+        setting_definition<bool>{ "bDisableSpellParry", &settings::config::bDisableSpellParry },
+        setting_definition<bool>{ "bEnableArrowProjectileReflection", &settings::config::bEnableArrowProjectileReflection },
+        setting_definition<bool>{ "bEnableMagicProjectileReflection", &settings::config::bEnableMagicProjectileReflection },
         setting_definition<bool>{ "enableRangedStagger", &settings::config::enableRangedStagger },
         setting_definition<bool>{ "enableSpellCasterStagger", &settings::config::enableSpellCasterStagger },
 
