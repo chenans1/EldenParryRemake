@@ -13,7 +13,7 @@ namespace settings {
 
         //doesn't delete the precision bash hitframe on ranged attackers.
         bool bashingAffectsRanged = true;
-        //this is to "parry" ranged attackers in melee, separate from parrying projectiles. 
+        //when enabled, ranged targets must be in a ranged attack state for a melee bash hitframe to apply.
         bool harderMeleeRangedBashing = false;
 
         bool bShieldEnabled = true;

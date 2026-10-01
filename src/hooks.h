@@ -177,8 +177,10 @@ class hooks {
 
         //when strict mode setting: Checked the ranged attacker to be in attack state.
         static bool checkRangedAttacker(RE::Actor* attacker) {
-            if (!attacker) return;
-            const auto attackerState = attacker->AsActorState()->GetAttackState();
+            if (!attacker) return false;
+            const auto* actorState = attacker->AsActorState();
+            if (!actorState) return false;
+            const auto attackerState = actorState->GetAttackState();
             return attackerState == RE::ATTACK_STATE_ENUM::kBowDrawn 
                 || attackerState == RE::ATTACK_STATE_ENUM::kBowReleasing
                 || isCharging(attacker);
@@ -194,6 +196,14 @@ class hooks {
             return (rightHand == 7 || rightHand == 8 || rightHand == 9 || rightHand == 12);
         }
 
+        // This is a bash-hitframe filter, not a parry decision
+        static bool shouldApplyMeleeBashToRanged(RE::Actor* target, const settings::config& cfg) {
+            if (!cfg.bashingAffectsRanged || !isRanged(target)) {
+                return false;
+            }
+            return !cfg.harderMeleeRangedBashing || checkRangedAttacker(target);
+        }
+
         // Check the current collision without applying any effects.
         static bool canParry(RE::Actor* attacker, RE::Actor* defender) {
             if (!attacker || !defender) return false;
@@ -202,12 +212,7 @@ class hooks {
             if (!defender->IsPlayerRef() && !cfg.enableNPCParry) return false;
             const auto attackerState = attacker->AsActorState()->GetAttackState();
             const auto defenderState = defender->AsActorState()->GetAttackState();
-            // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing || attackerState == RE::ATTACK_STATE_ENUM::kHit;
             const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing;
-            // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing 
-            //     || attackerState == RE::ATTACK_STATE_ENUM::kBowDrawn 
-            //     || attackerState == RE::ATTACK_STATE_ENUM::kBowReleasing
-            //     || isCharging(attacker);
             const bool defenderBashing = defenderState == RE::ATTACK_STATE_ENUM::kBash;
             if (!cfg.enablePowerBashParry && defender->IsPowerAttacking()) return false;
             if (cfg.log) {
@@ -301,6 +306,15 @@ class hooks {
                 return result;
             }
             if (attackerState == RE::ATTACK_STATE_ENUM::kBash) {
+                if (isRanged(victim)) {
+                    const bool applyBashHit = shouldApplyMeleeBashToRanged(victim, cfg);
+                    result.bIgnoreHit = !applyBashHit;
+                    if (cfg.log) {
+                        SKSE::log::info("[Precision pre-hit] ranged bash target={:08X} apply={} strictCheck={} ignored={}",
+                            victim->GetFormID(), applyBashHit, cfg.harderMeleeRangedBashing, result.bIgnoreHit);
+                    }
+                    return result;
+                }
                 if (!parryStyleEnabled(hit.attacker, cfg)) return result;
                 if (!cfg.enablePowerBashParry) {
                     if (hit.attacker->IsPowerAttacking()) return result;
@@ -342,6 +356,17 @@ class hooks {
             }
             // Apply the same directional decision when Precision does not handle the hit.
             if (a_aggressor->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
+                if (isRanged(a_victim)) {
+                    const bool applyBashHit = shouldApplyMeleeBashToRanged(a_victim, cfg);
+                    if (cfg.log) {
+                        SKSE::log::info("[processHit] ranged bash target={:08X} apply={} strictCheck={}",
+                            a_victim->GetFormID(), applyBashHit, cfg.harderMeleeRangedBashing);
+                    }
+                    if (!applyBashHit) {
+                        return;
+                    }
+                    return _ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
+                }
                 if (!parryStyleEnabled(a_aggressor, cfg) ||
                     (!a_aggressor->IsPlayerRef() && !cfg.enableNPCParry) ||
                     (!cfg.enablePowerBashParry && a_aggressor->IsPowerAttacking())) {
