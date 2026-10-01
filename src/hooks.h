@@ -99,6 +99,18 @@ class hooks {
 
         static void playParryEffects(RE::Actor* actor, bool playSound) {
             utils::ApplySpell(actor, actor, loadedForms.core.EP_BasherSpell);
+            const std::vector<RE::BGSExplosion*>* vfx = &loadedForms.core.VFXelse;
+            if (utils::isShield(actor)) {
+                vfx = &loadedForms.core.VFXshield;
+            } else if ((actor->GetEquippedObject(false) && actor->GetEquippedObject(false)->As<RE::TESObjectWEAP>()) ||
+                       (actor->GetEquippedObject(true) && actor->GetEquippedObject(true)->As<RE::TESObjectWEAP>())) {
+                vfx = &loadedForms.core.VFXweapon;
+            }
+            for (auto* explosion : *vfx) {
+                if (explosion) {
+                    actor->PlaceObjectAtMe(explosion, false);
+                }
+            }
             if (settings::Get().log) {
                 SKSE::log::info("[parry sound] actor={:08X} requested={}", actor->GetFormID(), playSound);
             }
@@ -489,7 +501,7 @@ class hooks {
         }
 
         static bool processProjectileParry(RE::Actor* a_parrier, RE::Projectile* a_projectile, RE::hkpCollidable* a_projectile_collidable,
-            bool a_reflect, bool a_stagger, float a_staggerMagnitude) {
+            bool a_reflect, bool a_spellProjectile, bool a_stagger, float a_staggerMagnitude) {
             if (canParryProjectile(a_parrier, a_projectile)) {
                 const auto cfg = settings::Get();
                 if (cfg.projectileBlockExperience > 0.0f && a_parrier->IsPlayerRef() &&
@@ -502,7 +514,11 @@ class hooks {
                     queueProjectileStagger(a_parrier, shooterActor, a_staggerMagnitude);
                 }
 
-                if (a_reflect) {
+                auto* requiredPerk = utils::isShield(a_parrier)
+                    ? (a_spellProjectile ? loadedForms.perks.ShieldSpellReflection : loadedForms.perks.ShieldArrowReflection)
+                    : (a_spellProjectile ? loadedForms.perks.NonShieldSpellReflection : loadedForms.perks.NonShieldArrowReflection);
+                const bool reflect = a_reflect && (!requiredPerk || a_parrier->HasPerk(requiredPerk));
+                if (reflect) {
                     utils::resetProjectileOwner(a_projectile, a_parrier, a_projectile_collidable);
                     if (shooter && shooter->Is3DLoaded()) {
                         utils::RetargetProjectile(a_projectile, shooter.get());
@@ -513,12 +529,12 @@ class hooks {
 
                 playParryEffects(a_parrier, claimParrySound(a_parrier));
                 queueRangedParryEvent();
-                if (!a_reflect) {
+                if (!reflect) {
                     a_projectile->Kill();
                 }
                 if (settings::Get().log) {
                     SKSE::log::info("[projectile parry] parrier={:08X} shooter={:08X} reflected={} staggerEnabled={} damageCancelled=true",
-                        a_parrier->GetFormID(), shooterActor ? shooterActor->GetFormID() : 0, a_reflect, a_stagger);
+                        a_parrier->GetFormID(), shooterActor ? shooterActor->GetFormID() : 0, reflect, a_stagger);
                 }
                 return true;
             }
@@ -556,7 +572,7 @@ class hooks {
                         (!actor->IsPlayerRef() && !cfg.enableNPCParry)) {
                         return false;
                     }
-                    return processProjectileParry(actor, a_projectile, a_projectileCollidable, reflect, stagger,
+                    return processProjectileParry(actor, a_projectile, a_projectileCollidable, reflect, spellProjectile, stagger,
                         cfg.staggerMagnitude);
                 };
                 if (tryParry(refrA, const_cast<RE::hkpCollidable*>(hit.rootCollidableB)) ||

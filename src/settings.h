@@ -27,8 +27,8 @@ namespace settings {
         bool includeDirectAttackerInAOEStagger = true;
         bool bEnableArrowProjectileDeflection = true;
         bool bEnableMagicProjectileDeflection = true;
-        bool enableRangedStagger = false;
-        bool enableSpellCasterStagger = false;
+        bool enableRangedStagger = true;
+        bool enableSpellCasterStagger = true;
 
     };
     

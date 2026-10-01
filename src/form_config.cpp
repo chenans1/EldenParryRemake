@@ -23,8 +23,6 @@ namespace form_config {
         constexpr auto defaultSFXshield = "EldenParry.esp ~ 0xD62";
         constexpr auto defaultSFXweapon = "EldenParry.esp ~ 0xD63";
 
-        // constexpr auto defaultExplosion = "EldenParryRemake.esp ~ 0x805";
-
         Config activeConfig{};
 
         std::string_view trim(std::string_view value) {
@@ -74,6 +72,9 @@ namespace form_config {
 
         template <class T>
         T* loadForm(std::string_view setting, std::string_view context) {
+            if (trim(setting).empty()) {
+                return nullptr;
+            }
             FormReference reference{};
             if (!parseFormReference(setting, context, reference)) {
                 return nullptr;
@@ -90,10 +91,43 @@ namespace form_config {
             return form;
         }
 
+        std::vector<RE::BGSExplosion*> loadExplosionList(std::string_view setting, std::string_view context) {
+            std::vector<RE::BGSExplosion*> forms;
+            while (!setting.empty()) {
+                const auto separator = setting.find(',');
+                const auto entry = trim(setting.substr(0, separator));
+                if (!entry.empty()) {
+                    if (auto* form = loadForm<RE::BGSExplosion>(entry, context)) {
+                        forms.push_back(form);
+                    } else {
+                        SKSE::log::warn("[VFX] Skipping invalid {} entry '{}'", context, entry);
+                    }
+                }
+                if (separator == std::string_view::npos) {
+                    break;
+                }
+                setting.remove_prefix(separator + 1);
+            }
+            return forms;
+        }
+
         bool createDefaults() {
             CSimpleIniA ini;
             ini.SetUnicode(false);
-            // ini.SetValue(coreSection, "ParrySpell", defaultParrySpell);
+            ini.SetValue(coreSection, "EP_AttackerSpell", defaultAttackerSpell);
+            ini.SetValue(coreSection, "EP_StaggerSpell", defaultStaggerSpell);
+            ini.SetValue(coreSection, "EP_AOEStaggerSpell", defaultAOEStaggerSpell);
+            ini.SetValue(coreSection, "EP_BasherSpell", defaultBasherSpell);
+            ini.SetValue(coreSection, "EP_StaggerMGEF", defaultStaggerMGEF);
+            ini.SetValue(coreSection, "EP_SFXShield", defaultSFXshield);
+            ini.SetValue(coreSection, "EP_SFXWeapon", defaultSFXweapon);
+            ini.SetValue(coreSection, "VFXshield", "");
+            ini.SetValue(coreSection, "VFXweapon", "");
+            ini.SetValue(coreSection, "VFXelse", "");
+            ini.SetValue(perkSection, "ShieldArrowReflection", "");
+            ini.SetValue(perkSection, "ShieldSpellReflection", "");
+            ini.SetValue(perkSection, "NonShieldArrowReflection", "");
+            ini.SetValue(perkSection, "NonShieldSpellReflection", "");
 
             std::error_code ec;
             std::filesystem::create_directories(std::filesystem::path(requirementsPath).parent_path(), ec);
@@ -134,6 +168,15 @@ namespace form_config {
 
         loaded.core.EP_SFXShield = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXShield", defaultSFXshield), "Core/EP_SFXShield");
         loaded.core.EP_SFXWeapon = loadForm<RE::BGSSoundDescriptorForm>(readSetting(ini, coreSection, "EP_SFXWeapon", defaultSFXweapon), "Core/EP_SFXWeapon");
+
+        loaded.core.VFXshield = loadExplosionList(readSetting(ini, coreSection, "VFXshield"), "Core/VFXshield");
+        loaded.core.VFXweapon = loadExplosionList(readSetting(ini, coreSection, "VFXweapon"), "Core/VFXweapon");
+        loaded.core.VFXelse = loadExplosionList(readSetting(ini, coreSection, "VFXelse"), "Core/VFXelse");
+
+        loaded.perks.ShieldArrowReflection = loadForm<RE::BGSPerk>(readSetting(ini, perkSection, "ShieldArrowReflection"), "PerkRequirements/ShieldArrowReflection");
+        loaded.perks.ShieldSpellReflection = loadForm<RE::BGSPerk>(readSetting(ini, perkSection, "ShieldSpellReflection"), "PerkRequirements/ShieldSpellReflection");
+        loaded.perks.NonShieldArrowReflection = loadForm<RE::BGSPerk>(readSetting(ini, perkSection, "NonShieldArrowReflection"), "PerkRequirements/NonShieldArrowReflection");
+        loaded.perks.NonShieldSpellReflection = loadForm<RE::BGSPerk>(readSetting(ini, perkSection, "NonShieldSpellReflection"), "PerkRequirements/NonShieldSpellReflection");
 
         activeConfig = loaded;
         SKSE::log::info("[forms] Loaded {}", requirementsPath);
