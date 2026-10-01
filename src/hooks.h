@@ -99,6 +99,18 @@ class hooks {
 
         static void playParryEffects(RE::Actor* actor, bool playSound) {
             utils::ApplySpell(actor, actor, loadedForms.core.EP_BasherSpell);
+            const std::vector<RE::BGSExplosion*>* vfx = &loadedForms.core.VFXelse;
+            if (utils::isShield(actor)) {
+                vfx = &loadedForms.core.VFXshield;
+            } else if ((actor->GetEquippedObject(false) && actor->GetEquippedObject(false)->As<RE::TESObjectWEAP>()) ||
+                       (actor->GetEquippedObject(true) && actor->GetEquippedObject(true)->As<RE::TESObjectWEAP>())) {
+                vfx = &loadedForms.core.VFXweapon;
+            }
+            for (auto* explosion : *vfx) {
+                if (explosion) {
+                    actor->PlaceObjectAtMe(explosion, false);
+                }
+            }
             if (settings::Get().log) {
                 SKSE::log::info("[parry sound] actor={:08X} requested={}", actor->GetFormID(), playSound);
             }
@@ -141,6 +153,69 @@ class hooks {
             return _creditedProjectiles[defender->GetFormID()].insert(projectile->GetFormID()).second;
         }
 
+        // new function to handle spell casters: check if they're in the charging/ready state but not release?
+        static bool isCharging(RE::Actor* attacker) {
+            if (!attacker) return false;
+
+            auto* rightCaster = attacker->GetMagicCaster(RE::MagicSystem::CastingSource::kRightHand);
+            auto* leftCaster = attacker->GetMagicCaster(RE::MagicSystem::CastingSource::kLeftHand);
+
+            if (!rightCaster && !leftCaster) {
+                return false;
+            }
+
+            const auto isActiveCastState = [](const RE::MagicCaster* caster) {
+                if (!caster) {
+                    return false;
+                }
+
+                return caster->state == RE::MagicCaster::State::kReady ||
+                    caster->state == RE::MagicCaster::State::kCharging ||
+                    caster->state == RE::MagicCaster::State::kCasting;
+            };
+
+            const bool rightActive = isActiveCastState(rightCaster);
+            const bool leftActive = isActiveCastState(leftCaster);
+            if (settings::Get().log) {
+                SKSE::log::info("[isCharging] attacker={:08X} rightState={} leftState={} active={}",
+                    attacker->GetFormID(),
+                    rightCaster ? rightCaster->state.underlying() : 0,
+                    leftCaster ? leftCaster->state.underlying() : 0,
+                    rightActive || leftActive);
+            }
+
+            return rightActive || leftActive;
+        }
+
+        //when strict mode setting: Checked the ranged attacker to be in attack state.
+        static bool checkRangedAttacker(RE::Actor* attacker) {
+            if (!attacker) return false;
+            const auto* actorState = attacker->AsActorState();
+            if (!actorState) return false;
+            const auto attackerState = actorState->GetAttackState();
+            return attackerState == RE::ATTACK_STATE_ENUM::kBowDrawn 
+                || attackerState == RE::ATTACK_STATE_ENUM::kBowReleasing
+                || isCharging(attacker);
+        }
+
+        //checks if the attacker is ranged. 
+        static bool isRanged(RE::Actor* actor) {
+            if (!actor) {
+                return false;
+            }
+            int rightHand = 0;
+            actor->GetGraphVariableInt("iRightHandType", rightHand);
+            return (rightHand == 7 || rightHand == 8 || rightHand == 9 || rightHand == 12);
+        }
+
+        // This is a bash-hitframe filter, not a parry decision
+        static bool shouldApplyMeleeBashToRanged(RE::Actor* target, const settings::config& cfg) {
+            if (!cfg.bashingAffectsRanged || !isRanged(target)) {
+                return false;
+            }
+            return !cfg.harderMeleeRangedBashing || checkRangedAttacker(target);
+        }
+
         // Check the current collision without applying any effects.
         static bool canParry(RE::Actor* attacker, RE::Actor* defender) {
             if (!attacker || !defender) return false;
@@ -149,7 +224,6 @@ class hooks {
             if (!defender->IsPlayerRef() && !cfg.enableNPCParry) return false;
             const auto attackerState = attacker->AsActorState()->GetAttackState();
             const auto defenderState = defender->AsActorState()->GetAttackState();
-            // const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing || attackerState == RE::ATTACK_STATE_ENUM::kHit;
             const bool attackerSwinging = attackerState == RE::ATTACK_STATE_ENUM::kSwing;
             const bool defenderBashing = defenderState == RE::ATTACK_STATE_ENUM::kBash;
             if (!cfg.enablePowerBashParry && defender->IsPowerAttacking()) return false;
@@ -244,6 +318,15 @@ class hooks {
                 return result;
             }
             if (attackerState == RE::ATTACK_STATE_ENUM::kBash) {
+                if (isRanged(victim)) {
+                    const bool applyBashHit = shouldApplyMeleeBashToRanged(victim, cfg);
+                    result.bIgnoreHit = !applyBashHit;
+                    if (cfg.log) {
+                        SKSE::log::info("[Precision pre-hit] ranged bash target={:08X} apply={} strictCheck={} ignored={}",
+                            victim->GetFormID(), applyBashHit, cfg.harderMeleeRangedBashing, result.bIgnoreHit);
+                    }
+                    return result;
+                }
                 if (!parryStyleEnabled(hit.attacker, cfg)) return result;
                 if (!cfg.enablePowerBashParry) {
                     if (hit.attacker->IsPowerAttacking()) return result;
@@ -251,6 +334,7 @@ class hooks {
                 if (!hit.attacker->IsPlayerRef() && !cfg.enableNPCParry){
                     return result;
                 }
+
                 if (resolveParry(victim, hit.attacker)) {
                     if (cfg.log) SKSE::log::info("[Precision pre-hit] allowing parry bash hit attacker={:08X} target={:08X}", hit.attacker->GetFormID(), victim->GetFormID());
                 } else {
@@ -284,6 +368,17 @@ class hooks {
             }
             // Apply the same directional decision when Precision does not handle the hit.
             if (a_aggressor->AsActorState()->GetAttackState() == RE::ATTACK_STATE_ENUM::kBash) {
+                if (isRanged(a_victim)) {
+                    const bool applyBashHit = shouldApplyMeleeBashToRanged(a_victim, cfg);
+                    if (cfg.log) {
+                        SKSE::log::info("[processHit] ranged bash target={:08X} apply={} strictCheck={}",
+                            a_victim->GetFormID(), applyBashHit, cfg.harderMeleeRangedBashing);
+                    }
+                    if (!applyBashHit) {
+                        return;
+                    }
+                    return _ProcessHit(a_aggressor, a_victim, a_int1, a_bool, a_unkptr);
+                }
                 if (!parryStyleEnabled(a_aggressor, cfg) ||
                     (!a_aggressor->IsPlayerRef() && !cfg.enableNPCParry) ||
                     (!cfg.enablePowerBashParry && a_aggressor->IsPowerAttacking())) {
@@ -406,7 +501,7 @@ class hooks {
         }
 
         static bool processProjectileParry(RE::Actor* a_parrier, RE::Projectile* a_projectile, RE::hkpCollidable* a_projectile_collidable,
-            bool a_reflect, bool a_stagger, float a_staggerMagnitude) {
+            bool a_reflect, bool a_spellProjectile, bool a_stagger, float a_staggerMagnitude) {
             if (canParryProjectile(a_parrier, a_projectile)) {
                 const auto cfg = settings::Get();
                 if (cfg.projectileBlockExperience > 0.0f && a_parrier->IsPlayerRef() &&
@@ -419,7 +514,11 @@ class hooks {
                     queueProjectileStagger(a_parrier, shooterActor, a_staggerMagnitude);
                 }
 
-                if (a_reflect) {
+                auto* requiredPerk = utils::isShield(a_parrier)
+                    ? (a_spellProjectile ? loadedForms.perks.ShieldSpellReflection : loadedForms.perks.ShieldArrowReflection)
+                    : (a_spellProjectile ? loadedForms.perks.NonShieldSpellReflection : loadedForms.perks.NonShieldArrowReflection);
+                const bool reflect = a_reflect && (!requiredPerk || a_parrier->HasPerk(requiredPerk));
+                if (reflect) {
                     utils::resetProjectileOwner(a_projectile, a_parrier, a_projectile_collidable);
                     if (shooter && shooter->Is3DLoaded()) {
                         utils::RetargetProjectile(a_projectile, shooter.get());
@@ -430,12 +529,12 @@ class hooks {
 
                 playParryEffects(a_parrier, claimParrySound(a_parrier));
                 queueRangedParryEvent();
-                if (!a_reflect) {
+                if (!reflect) {
                     a_projectile->Kill();
                 }
                 if (settings::Get().log) {
                     SKSE::log::info("[projectile parry] parrier={:08X} shooter={:08X} reflected={} staggerEnabled={} damageCancelled=true",
-                        a_parrier->GetFormID(), shooterActor ? shooterActor->GetFormID() : 0, a_reflect, a_stagger);
+                        a_parrier->GetFormID(), shooterActor ? shooterActor->GetFormID() : 0, reflect, a_stagger);
                 }
                 return true;
             }
@@ -455,7 +554,11 @@ class hooks {
                 return false;
             }
 
-            const bool reflect = spellProjectile ? cfg.bEnableMagicProjectileDeflection : cfg.bEnableArrowProjectileDeflection;
+            if (spellProjectile ? cfg.bDisableSpellParry : cfg.bDisableArrowParry) {
+                return false;
+            }
+
+            const bool reflect = spellProjectile ? cfg.bEnableMagicProjectileReflection : cfg.bEnableArrowProjectileReflection;
             const bool stagger = spellProjectile ? cfg.enableSpellCasterStagger : cfg.enableRangedStagger;
             if (!reflect && !stagger && cfg.projectileBlockExperience <= 0.0f) {
                 return false;
@@ -473,7 +576,7 @@ class hooks {
                         (!actor->IsPlayerRef() && !cfg.enableNPCParry)) {
                         return false;
                     }
-                    return processProjectileParry(actor, a_projectile, a_projectileCollidable, reflect, stagger,
+                    return processProjectileParry(actor, a_projectile, a_projectileCollidable, reflect, spellProjectile, stagger,
                         cfg.staggerMagnitude);
                 };
                 if (tryParry(refrA, const_cast<RE::hkpCollidable*>(hit.rootCollidableB)) ||

@@ -11,6 +11,11 @@ namespace settings {
         float meleeBlockExperience = 10.0f;
         float projectileBlockExperience = 20.0f;
 
+        //doesn't delete the precision bash hitframe on ranged attackers.
+        bool bashingAffectsRanged = true;
+        //when enabled, ranged targets must be in a ranged attack state for a melee bash hitframe to apply.
+        bool harderMeleeRangedBashing = false;
+
         bool bShieldEnabled = true;
         bool bNonShieldEnabled = true;
         bool enablePowerBashParry = false;
@@ -20,10 +25,13 @@ namespace settings {
         bool enableAOEStagger = true;
         float AOEStaggerRadius = 128.0f;
         bool includeDirectAttackerInAOEStagger = true;
-        bool bEnableArrowProjectileDeflection = true;
-        bool bEnableMagicProjectileDeflection = true;
-        bool enableRangedStagger = false;
-        bool enableSpellCasterStagger = false;
+
+        bool bDisableArrowParry = false;
+        bool bDisableSpellParry = false;
+        bool bEnableArrowProjectileReflection = true;
+        bool bEnableMagicProjectileReflection = true;
+        bool enableRangedStagger = true;
+        bool enableSpellCasterStagger = true;
 
     };
     
@@ -49,10 +57,16 @@ namespace settings {
         setting_definition<float>{ "AOEStaggerRadius", &settings::config::AOEStaggerRadius },
         setting_definition<bool>{ "includeDirectAttackerInAOEStagger", &settings::config::includeDirectAttackerInAOEStagger },
         setting_definition<bool>{ "enableNPCParry", &settings::config::enableNPCParry },
-        setting_definition<bool>{ "bEnableArrowProjectileDeflection", &settings::config::bEnableArrowProjectileDeflection },
-        setting_definition<bool>{ "bEnableMagicProjectileDeflection", &settings::config::bEnableMagicProjectileDeflection },
+        setting_definition<bool>{ "bDisableArrowParry", &settings::config::bDisableArrowParry },
+        setting_definition<bool>{ "bDisableSpellParry", &settings::config::bDisableSpellParry },
+        setting_definition<bool>{ "bEnableArrowProjectileReflection", &settings::config::bEnableArrowProjectileReflection },
+        setting_definition<bool>{ "bEnableMagicProjectileReflection", &settings::config::bEnableMagicProjectileReflection },
         setting_definition<bool>{ "enableRangedStagger", &settings::config::enableRangedStagger },
         setting_definition<bool>{ "enableSpellCasterStagger", &settings::config::enableSpellCasterStagger },
+
+        setting_definition<bool>{ "bashingAffectsRanged", &settings::config::bashingAffectsRanged },
+        setting_definition<bool>{ "harderMeleeRangedBashing", &settings::config::harderMeleeRangedBashing },
+
     };
 
     config Get();

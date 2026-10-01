@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 namespace form_config {
     inline constexpr auto requirementsPath = "Data/SKSE/Plugins/EldenParryForms.ini";
 
@@ -11,14 +13,21 @@ namespace form_config {
         RE::SpellItem* EP_BasherSpell = nullptr;
         RE::BGSSoundDescriptorForm* EP_SFXShield = nullptr;
         RE::BGSSoundDescriptorForm* EP_SFXWeapon = nullptr;
-        //todo: convert into lists of vfx instead.
-        // RE::BGSExplosion* VFXshield = nullptr;
-        // RE::BGSExplosion* VFXweapon = nullptr;
+        std::vector<RE::BGSExplosion*> VFXshield;
+        std::vector<RE::BGSExplosion*> VFXweapon;
+        std::vector<RE::BGSExplosion*> VFXelse;
+    };
+
+    struct PerkRequirements {
+        RE::BGSPerk* ShieldArrowReflection = nullptr;
+        RE::BGSPerk* ShieldSpellReflection = nullptr;
+        RE::BGSPerk* NonShieldArrowReflection = nullptr;
+        RE::BGSPerk* NonShieldSpellReflection = nullptr;
     };
 
     struct Config {
         CoreForms core;
-        //PerkRequirements
+        PerkRequirements perks;
     };
 
     // Loads and resolves every configured form. Missing files are created with elden parry defaults.
